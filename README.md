@@ -55,11 +55,11 @@ This repo now includes a GitHub Actions workflow at `.github/workflows/ci-cd.yml
 - `EC2_HOST`: public IP or DNS of your EC2 instance
 - `EC2_USER`: SSH user, for example `ubuntu`
 - `EC2_SSH_KEY`: private key content for the EC2 server
-- `EC2_APP_DIR`: absolute path to the repo on EC2
+- `EC2_APP_DIR`: absolute path where the repo should live on EC2, for example `/home/ubuntu/surveillance-main-server-frontend`
 
 ### One-time EC2 preparation
 
-Clone this repo on the EC2 server once and keep it on the branch you deploy from:
+You can clone this repo on the EC2 server once and keep it on the branch you deploy from:
 
 ```bash
 git clone https://github.com/Indominus-labs-org/surveillance-main-server-frontend.git
@@ -69,3 +69,5 @@ chmod +x deploy_nohup.sh
 ```
 
 After that, every push to `main` will build in GitHub Actions and deploy on the EC2 machine through SSH.
+
+If `EC2_APP_DIR` does not contain the repo yet, the workflow will clone it there automatically on the first deploy.
