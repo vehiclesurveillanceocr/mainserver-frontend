@@ -4,3 +4,6 @@ dist
 out
 coverage
 *.log
+tsconfig.tsbuildinfo
+.next-start.pid
+logs/
