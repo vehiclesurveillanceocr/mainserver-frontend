@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, Radar } from "lucide-react";
 
 import { auth } from "@/lib/auth-client";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import { Label } from "@/components/ui/label";
 
 function LoginForm() {
   const router = useRouter();
+  const { dictionary, isRTL } = useLanguage();
+  const copy = dictionary.scannerLogin;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +30,7 @@ function LoginForm() {
     const { error: signInError } = await auth.signIn.email({ email, password });
 
     if (signInError) {
-      setError(signInError.message || "Authentication failed. Check your credentials.");
+      setError(signInError.message || copy.failed);
       setLoading(false);
       return;
     }
@@ -36,7 +39,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden" dir={isRTL ? "rtl" : "ltr"}>
       <div
         className="absolute inset-0 opacity-[0.025]"
         style={{
@@ -61,10 +64,10 @@ function LoginForm() {
             <Radar className="w-8 h-8 text-primary" strokeWidth={1.5} />
           </div>
           <h1 className="text-2xl font-bold tracking-[0.2em] text-foreground uppercase">
-            Field Scanner
+            {copy.title}
           </h1>
           <p className="text-muted-foreground text-sm mt-2 tracking-wide">
-            Authorized personnel only
+            {copy.subtitle}
           </p>
         </div>
 
@@ -72,46 +75,54 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email" className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
-                Email Address
+                {copy.email}
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+                <Mail className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10", isRTL ? "right-3.5" : "left-3.5")} />
                 <Input
                   id="email"
                   type="email"
                   required
                   autoComplete="email"
+                  dir="ltr"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="officer@department.gov"
-                  className="h-auto bg-input border-border pl-10 py-3 placeholder:text-muted-foreground/40 focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0"
+                  placeholder={copy.emailPlaceholder}
+                  className={cn(
+                    "h-auto bg-input border-border py-3 placeholder:text-muted-foreground/40 focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0",
+                    isRTL ? "pr-10" : "pl-10",
+                  )}
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password" className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
-                Password
+                {copy.password}
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+                <Lock className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10", isRTL ? "right-3.5" : "left-3.5")} />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
+                  dir="ltr"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••"
-                  className="h-auto bg-input border-border pl-10 pr-11 py-3 placeholder:text-muted-foreground/40 focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0"
+                  placeholder={copy.passwordPlaceholder}
+                  className={cn(
+                    "h-auto bg-input border-border py-3 placeholder:text-muted-foreground/40 focus-visible:border-primary/40 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0",
+                    isRTL ? "pr-10 pl-11" : "pl-10 pr-11",
+                  )}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className={cn("absolute top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground", isRTL ? "left-1.5" : "right-1.5")}
+                  aria-label={showPassword ? copy.hidePassword : copy.showPassword}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
@@ -129,13 +140,13 @@ function LoginForm() {
               disabled={loading}
               className={cn("w-full mt-1 py-3 h-auto", !loading && "glow-primary")}
             >
-              {loading ? "Authenticating…" : "Sign In"}
+              {loading ? copy.authenticating : copy.signIn}
             </Button>
           </form>
         </div>
 
         <p className="text-center text-xs text-muted-foreground/40 mt-6">
-          This system is monitored. All access is logged.
+          {copy.monitored}
         </p>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,32 +25,6 @@ import {
 type MatchStatus = "ALL" | "PENDING" | "ACKNOWLEDGED" | "ESCALATED" | "FALSE_POSITIVE" | "RESOLVED";
 type AlertStatus = Exclude<MatchStatus, "ALL">;
 type ActionStatus = Exclude<AlertStatus, "PENDING">;
-
-const STATUS_CONFIG: Record<Exclude<MatchStatus, "ALL">, { label: string; color: string; icon: typeof Bell }> = {
-  PENDING: { label: "Pending", color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
-  ACKNOWLEDGED: { label: "Acknowledged", color: "bg-info/10 text-info border-info/20", icon: Eye },
-  ESCALATED: { label: "Escalated", color: "bg-destructive/10 text-destructive border-destructive/20", icon: ShieldAlert },
-  FALSE_POSITIVE: { label: "False Positive", color: "bg-muted text-muted-foreground border-border", icon: XCircle },
-  RESOLVED: { label: "Resolved", color: "bg-success/10 text-success border-success/20", icon: CheckCircle2 },
-};
-
-const TABS: { value: MatchStatus; label: string }[] = [
-  { value: "ALL", label: "All" },
-  { value: "PENDING", label: "Pending" },
-  { value: "ACKNOWLEDGED", label: "Acknowledged" },
-  { value: "ESCALATED", label: "Escalated" },
-  { value: "FALSE_POSITIVE", label: "False Positive" },
-  { value: "RESOLVED", label: "Resolved" },
-];
-
-const ACTION_STATUSES: ActionStatus[] = ["ACKNOWLEDGED", "ESCALATED", "FALSE_POSITIVE", "RESOLVED"];
-
-const ACTION_LABELS: Record<ActionStatus, string> = {
-  ACKNOWLEDGED: "Acknowledge",
-  ESCALATED: "Escalate",
-  FALSE_POSITIVE: "False Positive",
-  RESOLVED: "Resolve",
-};
 
 interface MatchEventDetection {
   plate: string;
@@ -103,16 +78,6 @@ interface MatchEventStats {
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 function priorityVariant(priority: string | null): "destructive" | "warning" | "secondary" | "outline" {
   if (priority === "HIGH") return "destructive";
   if (priority === "MEDIUM") return "warning";
@@ -126,13 +91,24 @@ function getTabCount(tab: MatchStatus, stats: MatchEventStats | null): number | 
   return stats[tab];
 }
 
-function getVehicleSummary(detection: MatchEventDetection | null): string {
-  if (!detection) return "Unknown vehicle";
+function getVehicleSummary(detection: MatchEventDetection | null, unknownVehicle: string): string {
+  if (!detection) return unknownVehicle;
   const parts = [detection.make, detection.model, detection.color, detection.category].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "Unknown vehicle";
+  return parts.length > 0 ? parts.join(" · ") : unknownVehicle;
 }
 
 function EmptyState() {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.alerts;
+
+  const statusConfig = {
+    PENDING: { label: copy.pending, color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
+    ACKNOWLEDGED: { label: copy.acknowledged, color: "bg-info/10 text-info border-info/20", icon: Eye },
+    ESCALATED: { label: copy.escalated, color: "bg-destructive/10 text-destructive border-destructive/20", icon: ShieldAlert },
+    FALSE_POSITIVE: { label: copy.falsePositive, color: "bg-muted text-muted-foreground border-border", icon: XCircle },
+    RESOLVED: { label: copy.resolved, color: "bg-success/10 text-success border-success/20", icon: CheckCircle2 },
+  } as const;
+
   return (
     <div className="glass rounded-xl p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
       <div className="relative mb-6">
@@ -141,14 +117,13 @@ function EmptyState() {
           <Bell className="h-10 w-10 text-muted-foreground" />
         </div>
       </div>
-      <h2 className="text-lg font-medium text-foreground mb-2">Awaiting Match Events</h2>
+      <h2 className="text-lg font-medium text-foreground mb-2">{copy.awaitingTitle}</h2>
       <p className="text-sm text-muted-foreground max-w-md">
-        Match events are ingested from workstations when detected plates match hitlist entries.
-        Connect and configure a workstation to begin receiving real-time alerts.
+        {copy.awaitingBody}
       </p>
 
       <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 gap-3 w-full max-w-2xl">
-        {Object.entries(STATUS_CONFIG).map(([key, config]) => {
+        {Object.entries(statusConfig).map(([key, config]) => {
           const Icon = config.icon;
           return (
             <Badge
@@ -167,6 +142,35 @@ function EmptyState() {
 }
 
 export default function AlertsPage() {
+  const { dictionary, isRTL, formatRelativeTime } = useLanguage();
+  const copy = dictionary.alerts;
+
+  const statusConfig: Record<Exclude<MatchStatus, "ALL">, { label: string; color: string; icon: typeof Bell }> = {
+    PENDING: { label: copy.pending, color: "bg-warning/10 text-warning border-warning/20", icon: AlertTriangle },
+    ACKNOWLEDGED: { label: copy.acknowledged, color: "bg-info/10 text-info border-info/20", icon: Eye },
+    ESCALATED: { label: copy.escalated, color: "bg-destructive/10 text-destructive border-destructive/20", icon: ShieldAlert },
+    FALSE_POSITIVE: { label: copy.falsePositive, color: "bg-muted text-muted-foreground border-border", icon: XCircle },
+    RESOLVED: { label: copy.resolved, color: "bg-success/10 text-success border-success/20", icon: CheckCircle2 },
+  };
+
+  const tabs: { value: MatchStatus; label: string }[] = [
+    { value: "ALL", label: copy.all },
+    { value: "PENDING", label: copy.pending },
+    { value: "ACKNOWLEDGED", label: copy.acknowledged },
+    { value: "ESCALATED", label: copy.escalated },
+    { value: "FALSE_POSITIVE", label: copy.falsePositive },
+    { value: "RESOLVED", label: copy.resolved },
+  ];
+
+  const actionLabels: Record<ActionStatus, string> = {
+    ACKNOWLEDGED: copy.acknowledge,
+    ESCALATED: copy.escalate,
+    FALSE_POSITIVE: copy.falsePositive,
+    RESOLVED: copy.resolve,
+  };
+
+  const actionStatuses: ActionStatus[] = ["ACKNOWLEDGED", "ESCALATED", "FALSE_POSITIVE", "RESOLVED"];
+
   const [activeTab, setActiveTab] = useState<MatchStatus>("ALL");
   const [events, setEvents] = useState<MatchEvent[]>([]);
   const [stats, setStats] = useState<MatchEventStats | null>(null);
@@ -206,14 +210,14 @@ export default function AlertsPage() {
       setTotal(pageData.total);
       setStats(statsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load alerts");
+      setError(err instanceof Error ? err.message : copy.loadError);
       setEvents([]);
       setTotal(0);
       setStats(null);
     } finally {
       setLoading(false);
     }
-  }, [fetchPage, fetchStats]);
+  }, [copy.loadError, fetchPage, fetchStats]);
 
   const refreshLoadedPages = useCallback(async () => {
     setRefreshing(true);
@@ -231,11 +235,11 @@ export default function AlertsPage() {
       setTotal(latest.total);
       setStats(statsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to refresh alerts");
+      setError(err instanceof Error ? err.message : copy.refreshError);
     } finally {
       setRefreshing(false);
     }
-  }, [activeTab, fetchPage, fetchStats, page]);
+  }, [activeTab, copy.refreshError, fetchPage, fetchStats, page]);
 
   useEffect(() => {
     setActionState(null);
@@ -243,8 +247,8 @@ export default function AlertsPage() {
   }, [activeTab, loadInitial]);
 
   const tabCounts = useMemo(
-    () => Object.fromEntries(TABS.map((tab) => [tab.value, getTabCount(tab.value, stats)])) as Record<MatchStatus, number | null>,
-    [stats],
+    () => Object.fromEntries(tabs.map((tab) => [tab.value, getTabCount(tab.value, stats)])) as Record<MatchStatus, number | null>,
+    [stats, tabs],
   );
 
   async function handleLoadMore() {
@@ -259,7 +263,7 @@ export default function AlertsPage() {
       setPage(pageData.page);
       setTotal(pageData.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more alerts");
+      setError(err instanceof Error ? err.message : copy.loadMoreError);
     } finally {
       setLoadingMore(false);
     }
@@ -285,22 +289,22 @@ export default function AlertsPage() {
       setActionState(null);
       await refreshLoadedPages();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update alert status");
+      setError(err instanceof Error ? err.message : copy.updateError);
     } finally {
       setSubmittingId(null);
     }
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Alerts</h1>
-          <p className="text-sm text-muted-foreground mt-1">Match events from workstation detections</p>
+          <h1 className="text-2xl font-semibold text-foreground">{copy.title}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{copy.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
           <Radio className="h-3 w-3 animate-pulse text-primary" />
-          {refreshing ? "Refreshing" : "Live monitoring"}
+          {refreshing ? dictionary.common.refreshing : dictionary.common.liveMonitoring}
         </div>
       </div>
 
@@ -315,14 +319,14 @@ export default function AlertsPage() {
             onClick={() => void loadInitial(activeTab)}
             className="glass glass-hover"
           >
-            Retry
+            {dictionary.common.retry}
           </Button>
         </div>
       )}
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as MatchStatus)}>
         <TabsList className="flex gap-2 flex-wrap bg-transparent p-0 h-auto">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
@@ -334,7 +338,7 @@ export default function AlertsPage() {
             >
               <span>{tab.label}</span>
               {tabCounts[tab.value] !== null && (
-                <span className="ml-2 rounded-full bg-black/10 px-2 py-0.5 text-[11px] leading-none data-[state=active]:bg-primary-foreground/20">
+                <span className={cn("rounded-full bg-black/10 px-2 py-0.5 text-[11px] leading-none data-[state=active]:bg-primary-foreground/20", isRTL ? "mr-2" : "ml-2")}>
                   {tabCounts[tab.value]}
                 </span>
               )}
@@ -342,7 +346,7 @@ export default function AlertsPage() {
           ))}
         </TabsList>
 
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             {loading ? (
               <div className="glass rounded-xl min-h-[400px] flex items-center justify-center">
@@ -355,7 +359,7 @@ export default function AlertsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {events.map((event) => {
                     const detection = event.detection;
-                    const status = STATUS_CONFIG[event.alertStatus];
+                    const status = statusConfig[event.alertStatus];
                     const StatusIcon = status.icon;
                     const priority = event.hitlistEntry?.priority?.toUpperCase() ?? null;
                     const isActionOpen = actionState?.eventId === event.id;
@@ -366,8 +370,8 @@ export default function AlertsPage() {
                           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0 space-y-3">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-2xl font-bold font-mono tracking-wide text-foreground truncate">
-                                  {detection?.plate ?? event.hitlistEntry?.plateOriginal ?? "Unknown plate"}
+                                <span className="text-2xl font-bold font-mono tracking-wide text-foreground truncate force-ltr">
+                                  {detection?.plate ?? event.hitlistEntry?.plateOriginal ?? copy.unknownPlate}
                                 </span>
                                 <Badge
                                   variant="outline"
@@ -378,44 +382,44 @@ export default function AlertsPage() {
                                 </Badge>
                                 {priority && (
                                   <Badge variant={priorityVariant(priority)}>
-                                    {priority} priority
+                                    {priority} {copy.prioritySuffix}
                                   </Badge>
                                 )}
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                                 <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Vehicle</p>
-                                  <p className="mt-1 text-foreground">{getVehicleSummary(detection)}</p>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.vehicle}</p>
+                                  <p className="mt-1 text-foreground">{getVehicleSummary(detection, copy.unknownVehicle)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Workstation</p>
-                                  <p className="mt-1 text-foreground">{event.workstation?.name ?? "Unknown workstation"}</p>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.workstation}</p>
+                                  <p className="mt-1 text-foreground">{event.workstation?.name ?? copy.unknownWorkstation}</p>
                                 </div>
                               </div>
 
                               {event.hitlistEntry?.reasonSummary && (
                                 <div className="rounded-lg border border-border bg-card/30 px-3 py-2">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Reason summary</p>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.reasonSummary}</p>
                                   <p className="mt-1 text-sm text-foreground">{event.hitlistEntry.reasonSummary}</p>
                                 </div>
                               )}
 
                               {event.note && (
                                 <div className="rounded-lg border border-border/80 px-3 py-2">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Latest note</p>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.latestNote}</p>
                                   <p className="mt-1 text-sm text-muted-foreground">{event.note}</p>
                                 </div>
                               )}
                             </div>
 
-                            <div className="text-xs text-muted-foreground shrink-0">
-                              {timeAgo(event.createdAt)}
+                            <div className="text-xs text-muted-foreground shrink-0 force-ltr">
+                              {formatRelativeTime(event.createdAt)}
                             </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
-                            {ACTION_STATUSES.filter((nextStatus) => nextStatus !== event.alertStatus).map((nextStatus) => (
+                            {actionStatuses.filter((nextStatus) => nextStatus !== event.alertStatus).map((nextStatus) => (
                               <Button
                                 key={nextStatus}
                                 type="button"
@@ -434,7 +438,7 @@ export default function AlertsPage() {
                                 )}
                                 disabled={submittingId === event.id}
                               >
-                                {ACTION_LABELS[nextStatus]}
+                                {actionLabels[nextStatus]}
                               </Button>
                             ))}
                           </div>
@@ -446,7 +450,7 @@ export default function AlertsPage() {
                                   htmlFor={`note-${event.id}`}
                                   className="text-xs font-medium text-muted-foreground mb-1.5 block"
                                 >
-                                  Optional note for {ACTION_LABELS[actionState.nextStatus].toLowerCase()}
+                                  {copy.optionalNoteFor} {actionLabels[actionState.nextStatus].toLowerCase()}
                                 </Label>
                                 <Input
                                   id={`note-${event.id}`}
@@ -457,7 +461,7 @@ export default function AlertsPage() {
                                       current ? { ...current, note: e.target.value } : current,
                                     )
                                   }
-                                  placeholder="Add operator note"
+                                  placeholder={copy.operatorNote}
                                   className="w-full bg-input border border-border"
                                 />
                               </div>
@@ -470,7 +474,7 @@ export default function AlertsPage() {
                                   className="glass glass-hover"
                                   disabled={submittingId === event.id}
                                 >
-                                  Cancel
+                                  {dictionary.common.cancel}
                                 </Button>
                                 <Button
                                   type="button"
@@ -478,8 +482,8 @@ export default function AlertsPage() {
                                   onClick={() => void handleConfirmAction()}
                                   disabled={submittingId === event.id}
                                 >
-                                  {submittingId === event.id && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                                  Confirm {ACTION_LABELS[actionState.nextStatus]}
+                                  {submittingId === event.id && <Loader2 className={cn("h-3.5 w-3.5 animate-spin", isRTL ? "ml-2" : "mr-2")} />}
+                                  {copy.confirm} {actionLabels[actionState.nextStatus]}
                                 </Button>
                               </div>
                             </div>
@@ -499,8 +503,8 @@ export default function AlertsPage() {
                       disabled={loadingMore}
                       className="glass glass-hover"
                     >
-                      {loadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Load More
+                      {loadingMore && <Loader2 className={cn("h-4 w-4 animate-spin", isRTL ? "ml-2" : "mr-2")} />}
+                      {copy.loadMore}
                     </Button>
                   </div>
                 )}

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { auth } from "@/lib/auth-client";
+import { useLanguage } from "@/components/language-provider";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ export function useToast() {
 
 function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const { dictionary, isRTL } = useLanguage();
 
   const toast = useCallback((opts: Omit<ToastItem, "id">) => {
     const id = Math.random().toString(36).slice(2);
@@ -74,7 +76,12 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div
+        className={cn(
+          "fixed bottom-4 z-50 flex flex-col gap-2 pointer-events-none",
+          isRTL ? "left-4" : "right-4",
+        )}
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -96,7 +103,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
               size="icon"
               onClick={() => dismiss(t.id)}
               className="shrink-0 text-muted-foreground hover:text-foreground mt-0.5 h-6 w-6"
-              aria-label="Dismiss notification"
+              aria-label={dictionary.common.close}
             >
               <X className="w-3.5 h-3.5" />
             </Button>
@@ -108,22 +115,20 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 type NavItem = {
-  label: string;
+  key: "dashboard" | "alerts" | "search" | "analytics" | "watchlist" | "devices" | "updates" | "settings";
   icon: React.ComponentType<{ className?: string }>;
   href: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/portal/dashboard" },
-  // Hidden for now, but the pages stay in the codebase for later reuse.
-  // { label: "Scanner", icon: Radar, href: "/portal/scan" },
-  // { label: "Cameras", icon: Camera, href: "/portal/cameras" },
-  { label: "Alerts", icon: Bell, href: "/portal/alerts" },
-  { label: "Search", icon: Search, href: "/portal/search" },
-  { label: "Analytics", icon: BarChart3, href: "/portal/analytics" },
-  { label: "Watchlist", icon: ListChecks, href: "/portal/watchlist" },
-  { label: "Devices", icon: HardDrive, href: "/portal/devices" },
-  { label: "Settings", icon: Settings, href: "/portal/settings" },
+  { key: "dashboard", icon: LayoutDashboard, href: "/portal/dashboard" },
+  { key: "alerts", icon: Bell, href: "/portal/alerts" },
+  { key: "search", icon: Search, href: "/portal/search" },
+  { key: "analytics", icon: BarChart3, href: "/portal/analytics" },
+  { key: "watchlist", icon: ListChecks, href: "/portal/watchlist" },
+  { key: "devices", icon: HardDrive, href: "/portal/devices" },
+  { key: "updates", icon: HardDrive, href: "/portal/updates" },
+  { key: "settings", icon: Settings, href: "/portal/settings" },
 ];
 
 function Sidebar({
@@ -135,11 +140,13 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { dictionary, isRTL } = useLanguage();
 
   return (
     <aside
       className={cn(
-        "relative hidden md:flex flex-col glass-heavy border-r border-border transition-all duration-300 ease-out shrink-0",
+        "relative hidden md:flex flex-col glass-heavy transition-all duration-300 ease-out shrink-0",
+        isRTL ? "border-l border-border" : "border-r border-border",
         collapsed ? "w-16" : "w-64",
       )}
     >
@@ -153,14 +160,16 @@ function Sidebar({
           <Shield className="w-4 h-4 text-primary" strokeWidth={1.5} />
         </div>
         {!collapsed && (
-          <span className="font-bold tracking-[0.15em] text-sm text-foreground">Vehicle Surveillance</span>
+          <span className="font-bold tracking-[0.15em] text-sm text-foreground">{dictionary.appName}</span>
         )}
       </div>
 
       <TooltipProvider>
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ label, icon: Icon, href }) => {
+          {NAV_ITEMS.map(({ key, icon: Icon, href }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
+            const label = dictionary.nav[key];
+
             return (
               <Tooltip key={href}>
                 <TooltipTrigger asChild>
@@ -182,7 +191,7 @@ function Sidebar({
                   </Button>
                 </TooltipTrigger>
                 {collapsed && (
-                  <TooltipContent side="right">{label}</TooltipContent>
+                  <TooltipContent side={isRTL ? "left" : "right"}>{label}</TooltipContent>
                 )}
               </Tooltip>
             );
@@ -199,14 +208,14 @@ function Sidebar({
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground glass-hover border border-transparent transition-all h-auto justify-start",
             collapsed && "justify-center px-2.5",
           )}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? dictionary.nav.expandSidebar : dictionary.nav.collapseSidebar}
         >
           {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
+            isRTL ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />
           ) : (
             <>
-              <ChevronLeft className="w-4 h-4" />
-              <span>Collapse</span>
+              {isRTL ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              <span>{dictionary.nav.collapse}</span>
             </>
           )}
         </Button>
@@ -218,6 +227,7 @@ function Sidebar({
 function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { dictionary, isRTL } = useLanguage();
 
   useEffect(() => {
     if (open) {
@@ -242,8 +252,9 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
       />
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full w-64 z-50 flex flex-col glass-heavy border-r border-border transition-transform duration-300 ease-out md:hidden",
-          open ? "translate-x-0" : "-translate-x-full",
+          "fixed top-0 h-full w-64 z-50 flex flex-col glass-heavy transition-transform duration-300 ease-out md:hidden",
+          isRTL ? "right-0 border-l border-border" : "left-0 border-r border-border",
+          open ? "translate-x-0" : isRTL ? "translate-x-full" : "-translate-x-full",
         )}
       >
         <div className="flex items-center justify-between px-4 py-5 border-b border-border">
@@ -251,7 +262,7 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             <div className="w-8 h-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
               <Shield className="w-4 h-4 text-primary" strokeWidth={1.5} />
             </div>
-            <span className="font-bold tracking-[0.15em] text-sm text-foreground">Vehicle Surveillance</span>
+            <span className="font-bold tracking-[0.15em] text-sm text-foreground">{dictionary.appName}</span>
           </div>
           <Button
             type="button"
@@ -259,15 +270,17 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
             size="icon"
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground h-8 w-8"
-            aria-label="Close menu"
+            aria-label={dictionary.nav.closeMenu}
           >
             <X className="w-4 h-4" />
           </Button>
         </div>
 
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ label, icon: Icon, href }) => {
+          {NAV_ITEMS.map(({ key, icon: Icon, href }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
+            const label = dictionary.nav[key];
+
             return (
               <Button
                 type="button"
@@ -298,11 +311,12 @@ function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void })
 
 function LiveClock() {
   const [time, setTime] = useState("--:--:--");
+  const { locale } = useLanguage();
 
   useEffect(() => {
     function tick() {
       setTime(
-        new Date().toLocaleTimeString("en-GB", {
+        new Date().toLocaleTimeString(locale, {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
@@ -310,21 +324,25 @@ function LiveClock() {
         }),
       );
     }
+
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [locale]);
 
   return (
-    <span className="font-mono text-sm text-muted-foreground tabular-nums tracking-wider">
+    <span className="font-mono text-sm text-muted-foreground tabular-nums tracking-wider force-ltr">
       {time}
     </span>
   );
 }
 
-function pageTitleFromPathname(pathname: string): string {
+function pageKeyFromPathname(pathname: string): NavItem["key"] {
   const segment = pathname.split("/").filter(Boolean).pop() ?? "dashboard";
-  return segment.charAt(0).toUpperCase() + segment.slice(1);
+  if (segment === "devices" || segment === "updates" || segment === "settings" || segment === "watchlist" || segment === "analytics" || segment === "search" || segment === "alerts" || segment === "dashboard") {
+    return segment;
+  }
+  return "devices";
 }
 
 function Header({
@@ -337,6 +355,7 @@ function Header({
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { dictionary } = useLanguage();
 
   async function handleSignOut() {
     await auth.signOut();
@@ -351,13 +370,13 @@ function Header({
         size="icon"
         onClick={onMobileMenu}
         className="md:hidden text-muted-foreground hover:text-foreground h-9 w-9"
-        aria-label="Open navigation menu"
+        aria-label={dictionary.nav.openMenu}
       >
         <Menu className="w-5 h-5" />
       </Button>
 
       <h1 className="font-semibold text-foreground text-sm flex-1">
-        {pageTitleFromPathname(pathname)}
+        {dictionary.nav[pageKeyFromPathname(pathname)]}
       </h1>
 
       <LiveClock />
@@ -369,8 +388,8 @@ function Header({
           size="icon"
           onClick={toggleTheme}
           className="text-muted-foreground hover:text-foreground glass-hover border border-transparent h-9 w-9"
-          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-          title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          aria-label={dictionary.common.darkMode}
+          title={dictionary.common.darkMode}
         >
           {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </Button>
@@ -392,10 +411,10 @@ function Header({
           size="sm"
           onClick={handleSignOut}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive glass-hover border border-transparent"
-          aria-label="Sign out"
+          aria-label={dictionary.common.signOut}
         >
           <LogOut className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Sign Out</span>
+          <span className="hidden sm:inline">{dictionary.common.signOut}</span>
         </Button>
       </div>
     </header>
@@ -405,6 +424,7 @@ function Header({
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: session, isPending } = auth.useSession();
+  const { dictionary, isRTL } = useLanguage();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -422,7 +442,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <div className="w-12 h-12 rounded-2xl glass glow-primary flex items-center justify-center">
             <Shield className="w-6 h-6 text-primary" strokeWidth={1.5} style={{ animation: "pulse 2s infinite" }} />
           </div>
-          <p className="text-sm text-muted-foreground">Verifying session…</p>
+          <p className="text-sm text-muted-foreground">{dictionary.common.loadingSession}</p>
         </div>
       </div>
     );
@@ -430,7 +450,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-background overflow-hidden">
+      <div className="flex h-screen bg-background overflow-hidden" dir={isRTL ? "rtl" : "ltr"}>
         <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
         <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 

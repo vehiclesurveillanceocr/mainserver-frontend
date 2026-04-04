@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,19 +13,13 @@ import {
   Plus,
   ChevronRight,
   ChevronDown,
-  Archive,
-  FileText,
   Loader2,
   AlertCircle,
   X,
   Upload,
   Hash,
-  Car,
-  Globe,
   Shield,
 } from "lucide-react";
-
-/* ── types ─────────────────────────────────────────── */
 
 type HitlistStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -64,8 +58,6 @@ interface Hitlist {
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
 
-/* ── helpers ───────────────────────────────────────── */
-
 function statusBadgeVariant(status: HitlistStatus): "success" | "warning" | "secondary" {
   const map: Record<HitlistStatus, "success" | "warning" | "secondary"> = {
     ACTIVE: "success",
@@ -75,30 +67,21 @@ function statusBadgeVariant(status: HitlistStatus): "success" | "warning" | "sec
   return map[status];
 }
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/* ── main ──────────────────────────────────────────── */
-
 export default function WatchlistPage() {
+  const { dictionary, isRTL, formatDate } = useLanguage();
+  const copy = dictionary.watchlist;
+  const common = dictionary.common;
+
   const [hitlists, setHitlists] = useState<Hitlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState<Hitlist | null>(null);
-
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createDesc, setCreateDesc] = useState("");
   const [creating, setCreating] = useState(false);
-
   const [showAddVersion, setShowAddVersion] = useState<string | null>(null);
   const [versionNote, setVersionNote] = useState("");
   const [versionEntries, setVersionEntries] = useState("");
@@ -112,11 +95,11 @@ export default function WatchlistPage() {
       if (resp.success) setHitlists(resp.data);
       else setError(resp.error);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load hitlists");
+      setError(e instanceof Error ? e.message : copy.listError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [copy.listError]);
 
   useEffect(() => { void fetchList(); }, [fetchList]);
 
@@ -133,7 +116,7 @@ export default function WatchlistPage() {
       if (resp.success) setDetailData(resp.data);
       else setError(resp.error);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load hitlist");
+      setError(e instanceof Error ? e.message : copy.detailError);
     } finally {
       setDetailLoading(false);
     }
@@ -157,7 +140,7 @@ export default function WatchlistPage() {
         setError(resp.error);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create hitlist");
+      setError(e instanceof Error ? e.message : copy.createError);
     } finally {
       setCreating(false);
     }
@@ -194,27 +177,25 @@ export default function WatchlistPage() {
         setError(resp.error);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to add version");
+      setError(e instanceof Error ? e.message : copy.versionError);
     } finally {
       setAddingVersion(false);
     }
   }
 
   const activeCount = hitlists.filter((h) => h.status === "ACTIVE").length;
-  const totalEntries = hitlists.reduce((sum, h) => {
-    const latest = h.versions?.[0];
-    return sum + (latest?.entries?.length ?? 0);
-  }, 0);
+  const totalEntries = hitlists.reduce((sum, h) => sum + (h.versions?.[0]?.entries?.length ?? 0), 0);
+  const statusLabel = (status: HitlistStatus) =>
+    status === "ACTIVE" ? common.active :
+    status === "DRAFT" ? common.draft :
+    common.archived;
 
   return (
-    <div className="space-y-6">
-      {/* header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Watchlist</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage hitlists and plate entries for workstation matching
-          </p>
+          <h1 className="text-2xl font-semibold text-foreground">{copy.title}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{copy.subtitle}</p>
         </div>
         <Button
           type="button"
@@ -222,16 +203,15 @@ export default function WatchlistPage() {
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium glow-primary"
         >
           <Plus className="h-4 w-4" />
-          New Hitlist
+          {copy.newHitlist}
         </Button>
       </div>
 
-      {/* stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Total Hitlists", value: hitlists.length, icon: ListChecks },
-          { label: "Active", value: activeCount, icon: Shield },
-          { label: "Total Entries", value: totalEntries, icon: Hash },
+          { label: copy.totalHitlists, value: hitlists.length, icon: ListChecks },
+          { label: common.active, value: activeCount, icon: Shield },
+          { label: copy.totalEntries, value: totalEntries, icon: Hash },
         ].map((s) => (
           <Card key={s.label} className="glass rounded-xl">
             <CardContent className="p-5 flex items-center gap-4">
@@ -247,7 +227,6 @@ export default function WatchlistPage() {
         ))}
       </div>
 
-      {/* error */}
       {error && (
         <div className="glass rounded-xl p-4 border border-destructive/30 bg-destructive/5 flex items-center gap-3">
           <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
@@ -258,52 +237,50 @@ export default function WatchlistPage() {
         </div>
       )}
 
-      {/* create modal */}
       {showCreate && (
         <div className="glass-heavy rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-foreground">Create Hitlist</h2>
+            <h2 className="text-base font-semibold text-foreground">{copy.createHitlist}</h2>
             <Button type="button" variant="ghost" size="icon" onClick={() => setShowCreate(false)} className="text-muted-foreground hover:text-foreground h-6 w-6">
               <X className="h-4 w-4" />
             </Button>
           </div>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <Label htmlFor="hl-name" className="text-xs font-medium text-muted-foreground mb-1.5 block">Name</Label>
+              <Label htmlFor="hl-name" className="text-xs font-medium text-muted-foreground mb-1.5 block">{copy.name}</Label>
               <Input
                 id="hl-name"
                 type="text"
                 required
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
-                placeholder="e.g. Stolen Vehicles Q1"
+                placeholder={copy.namePlaceholder}
                 className="w-full bg-input border border-border"
               />
             </div>
             <div>
-              <Label htmlFor="hl-desc" className="text-xs font-medium text-muted-foreground mb-1.5 block">Description (optional)</Label>
+              <Label htmlFor="hl-desc" className="text-xs font-medium text-muted-foreground mb-1.5 block">{copy.descriptionOptional}</Label>
               <Input
                 id="hl-desc"
                 type="text"
                 value={createDesc}
                 onChange={(e) => setCreateDesc(e.target.value)}
-                placeholder="Brief description"
+                placeholder={copy.descriptionPlaceholder}
                 className="w-full bg-input border border-border"
               />
             </div>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setShowCreate(false)} className="glass glass-hover">
-                Cancel
+                {common.cancel}
               </Button>
               <Button type="submit" disabled={creating}>
-                {creating ? "Creating…" : "Create"}
+                {creating ? copy.creating : common.create}
               </Button>
             </div>
           </form>
         </div>
       )}
 
-      {/* list */}
       {loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -313,74 +290,73 @@ export default function WatchlistPage() {
           <div className="glass rounded-full p-6 mb-4">
             <ListChecks className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-medium text-foreground mb-2">No Hitlists</h2>
+          <h2 className="text-lg font-medium text-foreground mb-2">{copy.noHitlists}</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Create your first hitlist to start tracking plates across workstations.
+            {copy.noHitlistsBody}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {hitlists.map((h) => (
             <div key={h.id} className="glass rounded-xl overflow-hidden">
-              <Button
-                variant="ghost"
-                onClick={() => void loadDetail(h.id)}
-                className="w-full flex items-center gap-4 px-5 py-4 text-left glass-hover transition-all h-auto justify-start"
-              >
-                {expandedId === h.id ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-foreground truncate">{h.name}</span>
-                    <Badge variant={statusBadgeVariant(h.status)} className="capitalize">
-                      {h.status.toLowerCase()}
-                    </Badge>
+              <div className="w-full flex items-center gap-4 px-5 py-4 glass-hover transition-all">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => void loadDetail(h.id)}
+                  className="flex-1 min-w-0 flex items-center gap-4 p-0 h-auto justify-start hover:bg-transparent"
+                >
+                  {expandedId === h.id ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-foreground truncate">{h.name}</span>
+                      <Badge variant={statusBadgeVariant(h.status)} className="capitalize">
+                        {statusLabel(h.status)}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      v{h.currentVersionNumber} · {h.versions?.[0]?.entries?.length ?? 0} {copy.totalEntries.toLowerCase()} · {copy.created} {formatDate(h.createdAt)}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    v{h.currentVersionNumber} · {h.versions?.[0]?.entries?.length ?? 0} entries · Created {fmtDate(h.createdAt)}
-                  </p>
-                </div>
+                </Button>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAddVersion(showAddVersion === h.id ? null : h.id);
-                    }}
+                    onClick={() => setShowAddVersion(showAddVersion === h.id ? null : h.id)}
                     className="text-xs glass glass-hover"
                   >
                     <Upload className="h-3 w-3" />
-                    Add Version
+                    {copy.addVersion}
                   </Button>
                 </div>
-              </Button>
+              </div>
 
-              {/* add version form */}
               {showAddVersion === h.id && (
                 <div className="border-t border-border px-5 py-4 bg-card/30">
                   <h3 className="text-sm font-medium text-foreground mb-3">
-                    Add Version to &ldquo;{h.name}&rdquo;
+                    {copy.addVersionTo} "{h.name}"
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <Label htmlFor={`vnote-${h.id}`} className="text-xs text-muted-foreground mb-1 block">Note (optional)</Label>
+                      <Label htmlFor={`vnote-${h.id}`} className="text-xs text-muted-foreground mb-1 block">{copy.noteOptional}</Label>
                       <Input
                         id={`vnote-${h.id}`}
                         type="text"
                         value={versionNote}
                         onChange={(e) => setVersionNote(e.target.value)}
-                        placeholder="e.g. Weekly update batch"
+                        placeholder={copy.notePlaceholder}
                         className="w-full bg-input border border-border"
                       />
                     </div>
                     <div>
                       <Label htmlFor={`ventries-${h.id}`} className="text-xs text-muted-foreground mb-1 block">
-                        Entries (one plate per line: plate, country, priority, reason, make, model, color)
+                        {copy.entriesHelp}
                       </Label>
                       <textarea
                         id={`ventries-${h.id}`}
@@ -399,7 +375,7 @@ export default function WatchlistPage() {
                         onClick={() => { setShowAddVersion(null); setVersionNote(""); setVersionEntries(""); }}
                         className="glass glass-hover"
                       >
-                        Cancel
+                        {common.cancel}
                       </Button>
                       <Button
                         type="button"
@@ -407,14 +383,13 @@ export default function WatchlistPage() {
                         disabled={addingVersion || !versionEntries.trim()}
                         onClick={() => void handleAddVersion(h.id)}
                       >
-                        {addingVersion ? "Uploading…" : "Upload Entries"}
+                        {addingVersion ? copy.uploading : copy.uploadEntries}
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* expanded detail */}
               {expandedId === h.id && (
                 <div className="border-t border-border">
                   {detailLoading ? (
@@ -429,20 +404,20 @@ export default function WatchlistPage() {
 
                       {detailData.versions.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-6">
-                          No versions yet. Upload entries to create the first version.
+                          {copy.noVersionsYet}
                         </p>
                       ) : (
                         detailData.versions.map((v) => (
                           <div key={v.id} className="space-y-2">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-xs font-medium text-foreground">
-                                Version {v.versionNumber}
+                                {copy.version} {v.versionNumber}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {v.entries.length} entries · {fmtDate(v.createdAt)}
+                                {v.entries.length} {copy.totalEntries.toLowerCase()} · {formatDate(v.createdAt)}
                               </span>
                               {v.note && (
-                                <span className="text-xs text-muted-foreground italic">— {v.note}</span>
+                                <span className="text-xs text-muted-foreground italic">- {v.note}</span>
                               )}
                             </div>
 
@@ -451,34 +426,34 @@ export default function WatchlistPage() {
                                 <table className="w-full text-xs">
                                   <thead>
                                     <tr className="border-b border-border bg-card/30">
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Plate</th>
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Normalized</th>
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Country</th>
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Priority</th>
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Reason</th>
-                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Vehicle</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{common.plate}</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{copy.normalized}</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{common.country}</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{common.priority}</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{common.reason}</th>
+                                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{common.vehicle}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {v.entries.slice(0, 20).map((entry) => (
                                       <tr key={entry.id} className="border-b border-border last:border-0">
-                                        <td className="px-3 py-2 text-foreground font-mono">{entry.plateOriginal}</td>
-                                        <td className="px-3 py-2 text-muted-foreground font-mono">{entry.plateNormalized}</td>
-                                        <td className="px-3 py-2 text-muted-foreground">{entry.countryOrRegion ?? "—"}</td>
-                                         <td className="px-3 py-2">
-                                           <Badge
-                                             variant={
-                                               entry.priority === "HIGH" ? "destructive"
-                                                 : entry.priority === "MEDIUM" ? "warning"
-                                                 : "outline"
-                                             }
-                                           >
-                                             {entry.priority ?? "—"}
-                                           </Badge>
-                                         </td>
-                                        <td className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">{entry.reasonSummary ?? "—"}</td>
+                                        <td className="px-3 py-2 text-foreground font-mono force-ltr">{entry.plateOriginal}</td>
+                                        <td className="px-3 py-2 text-muted-foreground font-mono force-ltr">{entry.plateNormalized}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">{entry.countryOrRegion ?? "-"}</td>
+                                        <td className="px-3 py-2">
+                                          <Badge
+                                            variant={
+                                              entry.priority === "HIGH" ? "destructive"
+                                                : entry.priority === "MEDIUM" ? "warning"
+                                                : "outline"
+                                            }
+                                          >
+                                            {entry.priority ?? "-"}
+                                          </Badge>
+                                        </td>
+                                        <td className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">{entry.reasonSummary ?? "-"}</td>
                                         <td className="px-3 py-2 text-muted-foreground">
-                                          {[entry.vehicleColor, entry.vehicleMake, entry.vehicleModel].filter(Boolean).join(" ") || "—"}
+                                          {[entry.vehicleColor, entry.vehicleMake, entry.vehicleModel].filter(Boolean).join(" ") || "-"}
                                         </td>
                                       </tr>
                                     ))}
@@ -486,7 +461,7 @@ export default function WatchlistPage() {
                                 </table>
                                 {v.entries.length > 20 && (
                                   <div className="px-3 py-2 text-xs text-muted-foreground text-center border-t border-border">
-                                    Showing 20 of {v.entries.length} entries
+                                    {copy.showing} 20 {copy.of} {v.entries.length} {copy.totalEntries.toLowerCase()}
                                   </div>
                                 )}
                               </div>

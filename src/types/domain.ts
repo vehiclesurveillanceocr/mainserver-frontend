@@ -19,6 +19,7 @@ export interface Workstation {
   deviceId: string;
   name: string;
   description: string | null;
+  deploymentProfile?: "fixed" | "vehicle";
   status: DeviceStatus;
   lastSeenAt: string | null;
   createdAt: string;
@@ -174,4 +175,33 @@ export interface WorkstationDetail {
   metrics: WorkstationMetrics;
   tabletStatus: TabletRuntimeStatus;
   cameras: WorkstationCamera[];
+}
+
+export type UpdateRolloutStatus = "PENDING" | "RECEIVED" | "COMPLETED" | "FAILED";
+
+export interface UpdateArtifact {
+  id: string;
+  version: string;
+  fileName: string;
+  fileSizeBytes: number;
+  releaseNotes: string | null;
+  packageType: ".deb";
+  createdAt: string;
+}
+
+export interface WorkstationUpdateStatus {
+  workstationId: string;
+  status: UpdateRolloutStatus;
+  assignedAt: string;
+  receivedAt: string | null;
+  completedAt: string | null;
+  note: string | null;
+}
+
+export interface UpdateRollout {
+  id: string;
+  artifact: UpdateArtifact;
+  targetProfile: "vehicle";
+  createdAt: string;
+  statuses: WorkstationUpdateStatus[];
 }

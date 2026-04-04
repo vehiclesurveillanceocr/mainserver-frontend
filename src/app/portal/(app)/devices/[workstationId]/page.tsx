@@ -18,6 +18,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,37 +95,6 @@ interface WorkstationDetail {
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
 
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "Never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function statusBadge(status: DeviceStatus) {
-  const map: Record<DeviceStatus, { label: string; variant: "success" | "destructive" | "warning" | "secondary" }> = {
-    ACTIVE: { label: "Online", variant: "success" },
-    OFFLINE: { label: "Offline", variant: "destructive" },
-    PENDING: { label: "Pending", variant: "warning" },
-    DISABLED: { label: "Disabled", variant: "secondary" },
-  };
-  return map[status] ?? map.OFFLINE;
-}
-
-function cameraBadge(status: CameraStatus) {
-  const map: Record<CameraStatus, { label: string; variant: "success" | "destructive" | "warning" | "secondary" }> = {
-    ONLINE: { label: "Online", variant: "success" },
-    OFFLINE: { label: "Offline", variant: "destructive" },
-    DEGRADED: { label: "Degraded", variant: "warning" },
-    MAINTENANCE: { label: "Maintenance", variant: "secondary" },
-  };
-  return map[status];
-}
-
 function geoTone(status: GeoStatus): "success" | "destructive" | "default" {
   if (status === "LOCKED") return "success";
   if (status === "OFFLINE") return "destructive";
@@ -137,6 +107,9 @@ export default function WorkstationDetailPage({
   params: Promise<{ workstationId: string }>;
 }) {
   const { workstationId } = use(params);
+  const { dictionary, isRTL, formatRelativeTime } = useLanguage();
+  const copy = dictionary.workstationDetail;
+  const common = dictionary.common;
   const [detail, setDetail] = useState<WorkstationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -156,7 +129,7 @@ export default function WorkstationDetailPage({
           setError(resp.error);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load workstation details");
+        setError(e instanceof Error ? e.message : copy.loadError);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -164,7 +137,19 @@ export default function WorkstationDetailPage({
     }
 
     void load();
-  }, [workstationId]);
+  }, [copy.loadError, workstationId]);
+
+  const statusLabel = (status: DeviceStatus) =>
+    status === "ACTIVE" ? common.online :
+    status === "OFFLINE" ? common.offline :
+    status === "PENDING" ? common.pending :
+    common.disabled;
+
+  const cameraLabel = (status: CameraStatus) =>
+    status === "ONLINE" ? common.online :
+    status === "OFFLINE" ? common.offline :
+    status === "DEGRADED" ? common.degraded :
+    common.maintenance;
 
   if (loading) {
     return (
@@ -185,38 +170,38 @@ export default function WorkstationDetailPage({
 
   if (!detail) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
         <Button asChild variant="outline" className="glass glass-hover w-fit">
-          <Link href="/portal/devices"><ArrowLeft className="h-4 w-4" /> Back to Workstations</Link>
+          <Link href="/portal/devices"><ArrowLeft className="h-4 w-4" /> {copy.back}</Link>
         </Button>
         <div className="glass rounded-xl p-6 border border-destructive/30 bg-destructive/5">
-          <p className="text-sm text-destructive">{error ?? "Workstation not found."}</p>
+          <p className="text-sm text-destructive">{error ?? copy.notFound}</p>
         </div>
       </div>
     );
   }
 
-  const workstationMeta = statusBadge(detail.workstation.status);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="space-y-3">
           <Button asChild variant="outline" className="glass glass-hover w-fit">
-            <Link href="/portal/devices"><ArrowLeft className="h-4 w-4" /> Back to Workstations</Link>
+            <Link href="/portal/devices"><ArrowLeft className="h-4 w-4" /> {copy.back}</Link>
           </Button>
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-semibold text-foreground">{detail.workstation.name}</h1>
-            <Badge variant={workstationMeta.variant}>{workstationMeta.label}</Badge>
+            <Badge variant={detail.workstation.status === "ACTIVE" ? "success" : detail.workstation.status === "OFFLINE" ? "destructive" : detail.workstation.status === "PENDING" ? "warning" : "secondary"}>
+              {statusLabel(detail.workstation.status)}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {detail.workstation.deviceId} • Last seen {timeAgo(detail.workstation.lastSeenAt)} • Uptime {detail.metrics.uptimeHours}h
+            <span className="force-ltr">{detail.workstation.deviceId}</span> · {copy.lastSeen} <span className="force-ltr">{formatRelativeTime(detail.workstation.lastSeenAt)}</span> · {copy.uptime} {detail.metrics.uptimeHours}h
           </p>
         </div>
 
         <Button type="button" variant="outline" className="glass glass-hover gap-2" disabled={refreshing}>
           <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-          Refresh
+          {common.refresh}
         </Button>
       </div>
 
@@ -232,35 +217,35 @@ export default function WorkstationDetailPage({
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-2">
               <MonitorSmartphone className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-foreground">Tablet Link</h2>
+              <h2 className="text-sm font-semibold text-foreground">{copy.tabletLink}</h2>
             </div>
             <div>
               <p className="text-base font-medium text-foreground">
-                {detail.tablet ? detail.tablet.name : "No tablet linked"}
+                {detail.tablet ? detail.tablet.name : dictionary.devices.noTabletLinked}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {detail.tablet
-                  ? `${detail.tablet.deviceId} • Last heartbeat ${timeAgo(detail.tabletStatus.lastHeartbeatAt)}`
-                  : "Assign a tablet to enable field response monitoring"}
+                  ? `${detail.tablet.deviceId} · ${copy.lastHeartbeat} ${formatRelativeTime(detail.tabletStatus.lastHeartbeatAt)}`
+                  : copy.assignTablet}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <InfoTile
                 icon={detail.tabletStatus.connectedToWorkstation ? Wifi : WifiOff}
-                label="Connected"
-                value={detail.tabletStatus.connectedToWorkstation ? "Yes" : "No"}
+                label={common.connected}
+                value={detail.tabletStatus.connectedToWorkstation ? common.yes : common.no}
                 tone={detail.tabletStatus.connectedToWorkstation ? "success" : "destructive"}
               />
-              <InfoTile icon={MonitorSmartphone} label="Signal" value={detail.tabletStatus.signalStrength} />
+              <InfoTile icon={MonitorSmartphone} label={common.signal} value={detail.tabletStatus.signalStrength} />
               <InfoTile
                 icon={HardDrive}
-                label="Battery"
-                value={detail.tabletStatus.batteryLevel !== null ? `${detail.tabletStatus.batteryLevel}%` : "N/A"}
+                label={common.battery}
+                value={detail.tabletStatus.batteryLevel !== null ? `${detail.tabletStatus.batteryLevel}%` : common.notAvailable}
               />
               <InfoTile
                 icon={MemoryStick}
-                label="Tablet Memory"
-                value={detail.tabletStatus.memoryUsagePercent !== null ? `${detail.tabletStatus.memoryUsagePercent}%` : "N/A"}
+                label={copy.tabletMemory}
+                value={detail.tabletStatus.memoryUsagePercent !== null ? `${detail.tabletStatus.memoryUsagePercent}%` : common.notAvailable}
               />
             </div>
           </CardContent>
@@ -270,25 +255,25 @@ export default function WorkstationDetailPage({
           <CardContent className="p-6 space-y-5">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-foreground">Workstation Runtime</h2>
+              <h2 className="text-sm font-semibold text-foreground">{copy.workstationRuntime}</h2>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <InfoTile icon={Cpu} label="CPU Usage" value={`${detail.metrics.cpuUsagePercent}%`} />
-              <InfoTile icon={MemoryStick} label="Memory Usage" value={`${detail.metrics.memoryUsagePercent}%`} />
-              <InfoTile icon={HardDrive} label="Storage Usage" value={`${detail.metrics.storageUsagePercent}%`} />
-              <InfoTile icon={Wifi} label="Uplink" value={`${detail.metrics.networkUplinkMbps} Mbps`} />
-              <InfoTile icon={Thermometer} label="Temperature" value={`${detail.metrics.temperatureC}°C`} />
-              <InfoTile icon={MapPinned} label="GPS" value={detail.metrics.gpsStatus} tone={geoTone(detail.metrics.gpsStatus)} />
-              <InfoTile icon={Satellite} label="GNSS" value={detail.metrics.gnssStatus} tone={geoTone(detail.metrics.gnssStatus)} />
-              <InfoTile icon={Camera} label="Cameras" value={`${detail.cameras.length}`} />
+              <InfoTile icon={Cpu} label={copy.cpuUsage} value={`${detail.metrics.cpuUsagePercent}%`} />
+              <InfoTile icon={MemoryStick} label={copy.memoryUsage} value={`${detail.metrics.memoryUsagePercent}%`} />
+              <InfoTile icon={HardDrive} label={copy.storageUsage} value={`${detail.metrics.storageUsagePercent}%`} />
+              <InfoTile icon={Wifi} label={common.uplink} value={`${detail.metrics.networkUplinkMbps} Mbps`} />
+              <InfoTile icon={Thermometer} label={common.temperature} value={`${detail.metrics.temperatureC}°C`} />
+              <InfoTile icon={MapPinned} label={common.gps} value={detail.metrics.gpsStatus} tone={geoTone(detail.metrics.gpsStatus)} />
+              <InfoTile icon={Satellite} label={common.gnss} value={detail.metrics.gnssStatus} tone={geoTone(detail.metrics.gnssStatus)} />
+              <InfoTile icon={Camera} label={common.cameras} value={`${detail.cameras.length}`} />
             </div>
             <div className="rounded-xl border border-border bg-card/30 p-4">
-              <p className="text-xs text-muted-foreground">Navigation Fix</p>
+              <p className="text-xs text-muted-foreground">{copy.navigationFix}</p>
               <p className="mt-2 text-sm font-semibold text-foreground">
-                Last GPS fix {timeAgo(detail.metrics.lastFixAt)}
+                {copy.lastGpsFix} {formatRelativeTime(detail.metrics.lastFixAt)}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                GNSS receiver is {detail.metrics.gnssStatus.toLowerCase()} and location telemetry is being monitored centrally.
+                {copy.gnssMonitored.replace("{status}", detail.metrics.gnssStatus.toLowerCase())}
               </p>
             </div>
           </CardContent>
@@ -297,46 +282,43 @@ export default function WorkstationDetailPage({
 
       <div className="space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Camera Grid</h2>
+          <h2 className="text-lg font-semibold text-foreground">{copy.cameraGrid}</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Six-camera status board for this workstation, including stream freshness and per-camera health notes.
+            {copy.cameraGridSubtitle}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {detail.cameras.map((camera) => {
-            const badge = cameraBadge(camera.status);
-            return (
-              <Card key={camera.id} className="glass rounded-2xl border-border/70">
-                <CardContent className="p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-foreground">{camera.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{camera.position}</p>
-                    </div>
-                    <Badge variant={badge.variant}>{badge.label}</Badge>
+          {detail.cameras.map((camera) => (
+            <Card key={camera.id} className="glass rounded-2xl border-border/70">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">{camera.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{camera.position}</p>
                   </div>
+                  <Badge variant={camera.status === "ONLINE" ? "success" : camera.status === "OFFLINE" ? "destructive" : camera.status === "DEGRADED" ? "warning" : "secondary"}>{cameraLabel(camera.status)}</Badge>
+                </div>
 
-                  <div className="aspect-video rounded-xl border border-border bg-card/30 flex items-center justify-center">
-                    <div className="text-center text-muted-foreground">
-                      <Camera className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-xs">{camera.resolution}</p>
-                    </div>
+                <div className="aspect-video rounded-xl border border-border bg-card/30 flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <Camera className="h-8 w-8 mx-auto mb-2" />
+                    <p className="text-xs force-ltr">{camera.resolution}</p>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <InfoTile icon={Camera} label="FPS" value={`${camera.fps}`} />
-                    <InfoTile icon={Wifi} label="Last Frame" value={timeAgo(camera.lastFrameAt)} />
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoTile icon={Camera} label="FPS" value={`${camera.fps}`} />
+                  <InfoTile icon={Wifi} label={copy.lastFrame} value={formatRelativeTime(camera.lastFrameAt)} />
+                </div>
 
-                  <div className="rounded-xl border border-border bg-card/30 p-3">
-                    <p className="text-xs text-muted-foreground">Health Note</p>
-                    <p className="text-sm text-foreground mt-1">{camera.healthNote}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                <div className="rounded-xl border border-border bg-card/30 p-3">
+                  <p className="text-xs text-muted-foreground">{copy.healthNote}</p>
+                  <p className="text-sm text-foreground mt-1">{camera.healthNote}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     </div>

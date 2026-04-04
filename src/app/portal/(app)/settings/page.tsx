@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/auth-client";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   User,
   Shield,
@@ -21,16 +29,10 @@ import {
   Save,
   Loader2,
   CheckCircle,
+  Languages,
 } from "lucide-react";
 
 type SettingsTab = "profile" | "security" | "notifications" | "system";
-
-const TABS: { value: SettingsTab; label: string; icon: typeof User }[] = [
-  { value: "profile", label: "Profile", icon: User },
-  { value: "security", label: "Security", icon: Shield },
-  { value: "notifications", label: "Notifications", icon: Bell },
-  { value: "system", label: "System", icon: Monitor },
-];
 
 function SettingsCard({
   title,
@@ -64,7 +66,7 @@ function Toggle({
   label: string;
 }) {
   return (
-    <div className="flex items-center justify-between w-full py-3">
+    <div className="flex items-center justify-between w-full py-3 gap-4">
       <Label className="text-sm text-foreground font-normal cursor-pointer">{label}</Label>
       <Switch checked={enabled} onCheckedChange={() => onToggle()} />
     </div>
@@ -100,6 +102,16 @@ function InputField({
 
 export default function SettingsPage() {
   const { data: session } = auth.useSession();
+  const { dictionary, language, setLanguage } = useLanguage();
+  const copy = dictionary.settings;
+
+  const tabs: { value: SettingsTab; label: string; icon: typeof User }[] = [
+    { value: "profile", label: copy.profile, icon: User },
+    { value: "security", label: copy.security, icon: Shield },
+    { value: "notifications", label: copy.notifications, icon: Bell },
+    { value: "system", label: copy.system, icon: Monitor },
+  ];
+
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -151,15 +163,15 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{copy.title}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage your account and system preferences
+          {copy.subtitle}
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SettingsTab)}>
         <TabsList className="flex gap-2 flex-wrap bg-transparent p-0 h-auto">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const TabIcon = t.icon;
             return (
               <TabsTrigger
@@ -181,19 +193,19 @@ export default function SettingsPage() {
         {saved && (
           <div className="glass rounded-xl p-4 border border-success/30 bg-success/5 flex items-center gap-3 mt-6">
             <CheckCircle className="h-4 w-4 text-success" />
-            <p className="text-sm text-success">Settings saved successfully.</p>
+            <p className="text-sm text-success">{copy.saved}</p>
           </div>
         )}
 
         <TabsContent value="profile" className="mt-6">
           <SettingsCard
-            title="Profile Information"
-            description="Update your account details."
+            title={copy.profileInfo}
+            description={copy.profileInfoDesc}
           >
             <form onSubmit={handleSaveProfile} className="space-y-4 max-w-lg">
               <InputField
                 id="profile-name"
-                label="Display Name"
+                label={copy.displayName}
                 icon={User}
                 type="text"
                 value={name}
@@ -201,14 +213,14 @@ export default function SettingsPage() {
               />
               <InputField
                 id="profile-email"
-                label="Email Address"
+                label={copy.emailAddress}
                 icon={Mail}
                 type="email"
                 value={email}
                 disabled
               />
               <p className="text-xs text-muted-foreground">
-                Email changes require admin assistance.
+                {copy.emailHelp}
               </p>
               <div className="flex justify-end">
                 <Button
@@ -221,7 +233,7 @@ export default function SettingsPage() {
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  Save Changes
+                  {dictionary.common.saveChanges}
                 </Button>
               </div>
             </form>
@@ -231,8 +243,8 @@ export default function SettingsPage() {
         <TabsContent value="security" className="mt-6">
           <div className="space-y-4">
             <SettingsCard
-              title="Change Password"
-              description="Update your authentication credentials."
+              title={copy.changePassword}
+              description={copy.changePasswordDesc}
             >
               <form
                 onSubmit={handleChangePassword}
@@ -240,7 +252,7 @@ export default function SettingsPage() {
               >
                 <InputField
                   id="current-pw"
-                  label="Current Password"
+                  label={copy.currentPassword}
                   icon={Lock}
                   type="password"
                   value={currentPassword}
@@ -249,7 +261,7 @@ export default function SettingsPage() {
                 />
                 <InputField
                   id="new-pw"
-                  label="New Password"
+                  label={copy.newPassword}
                   icon={KeyRound}
                   type="password"
                   value={newPassword}
@@ -258,7 +270,7 @@ export default function SettingsPage() {
                 />
                 <InputField
                   id="confirm-pw"
-                  label="Confirm New Password"
+                  label={copy.confirmPassword}
                   icon={KeyRound}
                   type="password"
                   value={confirmPassword}
@@ -269,7 +281,7 @@ export default function SettingsPage() {
                   confirmPassword &&
                   newPassword !== confirmPassword && (
                     <p className="text-xs text-destructive">
-                      Passwords do not match.
+                      {copy.passwordsMismatch}
                     </p>
                   )}
                 <div className="flex justify-end">
@@ -288,21 +300,21 @@ export default function SettingsPage() {
                     ) : (
                       <Lock className="h-4 w-4" />
                     )}
-                    Update Password
+                    {copy.updatePassword}
                   </Button>
                 </div>
               </form>
             </SettingsCard>
 
-            <SettingsCard title="Session Information">
+            <SettingsCard title={copy.sessionInfo}>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Signed in as</span>
-                  <span className="text-foreground font-medium">{email}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">{copy.signedInAs}</span>
+                  <span className="text-foreground font-medium force-ltr">{email}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Role</span>
-                  <span className="text-foreground font-medium">Operator</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">{copy.role}</span>
+                  <span className="text-foreground font-medium">{copy.operator}</span>
                 </div>
               </div>
             </SettingsCard>
@@ -311,57 +323,56 @@ export default function SettingsPage() {
 
         <TabsContent value="notifications" className="mt-6">
           <SettingsCard
-            title="Notification Preferences"
-            description="Configure how you receive alerts and updates."
+            title={copy.notificationPreferences}
+            description={copy.notificationDesc}
           >
             <div className="max-w-lg divide-y divide-border">
               <Toggle
                 enabled={notifyAlerts}
                 onToggle={() => setNotifyAlerts(!notifyAlerts)}
-                label="Match alert notifications"
+                label={copy.matchAlertNotifications}
               />
               <Toggle
                 enabled={notifyDeviceOffline}
                 onToggle={() => setNotifyDeviceOffline(!notifyDeviceOffline)}
-                label="Device offline alerts"
+                label={copy.deviceOfflineAlerts}
               />
               <Toggle
                 enabled={notifyNewVersion}
                 onToggle={() => setNotifyNewVersion(!notifyNewVersion)}
-                label="Hitlist version updates"
+                label={copy.hitlistVersionUpdates}
               />
               <Toggle
                 enabled={notifySounds}
                 onToggle={() => setNotifySounds(!notifySounds)}
-                label="Sound effects"
+                label={copy.soundEffects}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              Notification preferences are stored locally. Server-side delivery is
-              not yet implemented.
+              {copy.notificationHelp}
             </p>
           </SettingsCard>
         </TabsContent>
 
         <TabsContent value="system" className="mt-6">
           <div className="space-y-4">
-            <SettingsCard title="System Information">
+            <SettingsCard title={copy.systemInfo}>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Platform</span>
-                  <span className="text-foreground font-mono text-xs">
-                    Vehicle Surveillance v1.0
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">{copy.platform}</span>
+                  <span className="text-foreground font-mono text-xs force-ltr">
+                    {dictionary.appName} v1.0
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Data Source</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">{copy.dataSource}</span>
                   <span className="text-foreground font-mono text-xs">
-                    In-memory mock store
+                    {copy.mockStore}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Frontend</span>
-                  <span className="text-foreground font-mono text-xs">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">{copy.frontend}</span>
+                  <span className="text-foreground font-mono text-xs force-ltr">
                     Next.js + Tailwind
                   </span>
                 </div>
@@ -369,17 +380,43 @@ export default function SettingsPage() {
             </SettingsCard>
 
             <SettingsCard
-              title="Appearance"
-              description="Visual preferences for the portal interface."
+              title={copy.appearance}
+              description={copy.appearanceDesc}
             >
               <div className="max-w-lg space-y-3">
-                <div className="flex items-center justify-between py-2">
+                <div className="flex items-center justify-between py-2 gap-4">
                   <div className="flex items-center gap-3">
                     <Moon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">Dark Mode</span>
+                    <span className="text-sm text-foreground">{dictionary.common.darkMode}</span>
                   </div>
-                  <Badge variant="secondary">Always on</Badge>
+                  <Badge variant="secondary">{dictionary.common.alwaysOn}</Badge>
                 </div>
+              </div>
+            </SettingsCard>
+
+            <SettingsCard
+              title={copy.languageAndRegion}
+              description={copy.languageDesc}
+            >
+              <div className="max-w-lg space-y-4">
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <Languages className="h-3 w-3" />
+                    {dictionary.common.language}
+                  </Label>
+                  <Select value={language} onValueChange={(value) => setLanguage(value as "en" | "ar")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">{dictionary.common.english}</SelectItem>
+                      <SelectItem value="ar">{dictionary.common.arabic}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {copy.languageHelp}
+                </p>
               </div>
             </SettingsCard>
           </div>

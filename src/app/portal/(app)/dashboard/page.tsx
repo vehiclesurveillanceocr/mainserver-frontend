@@ -1,9 +1,10 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { api } from "@/lib/api"
-import { cn } from "@/lib/utils"
-import { Monitor, Tablet, Link2, FileText, AlertCircle, Activity, Clock, CheckCircle } from "lucide-react"
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { useLanguage } from "@/components/language-provider";
+import { cn } from "@/lib/utils";
+import { Monitor, Tablet, Link2, FileText, AlertCircle, Activity, Clock, CheckCircle } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -12,9 +13,9 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-} from "recharts"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+} from "recharts";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 type DeviceStatus = "PENDING" | "ACTIVE" | "OFFLINE" | "DISABLED";
 type HitlistStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -80,50 +81,15 @@ function getStatusColor(status: string): string {
   return map[status] ?? "oklch(0.40 0.005 260)";
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "Never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function workstationHealthMeta(status: DeviceStatus): {
-  label: string;
-  dotClass: string;
-  badgeVariant: "success" | "destructive" | "warning" | "secondary";
-} {
-  const map: Record<DeviceStatus, { label: string; dotClass: string; badgeVariant: "success" | "destructive" | "warning" | "secondary" }> = {
-    ACTIVE: { label: "Active", dotClass: "bg-success", badgeVariant: "success" },
-    OFFLINE: { label: "Offline", dotClass: "bg-destructive", badgeVariant: "destructive" },
-    PENDING: { label: "Pending", dotClass: "bg-warning", badgeVariant: "warning" },
-    DISABLED: { label: "Disabled", dotClass: "bg-muted-foreground", badgeVariant: "secondary" },
-  };
-
-  return map[status] ?? map.OFFLINE;
-}
-
 function SkeletonCard() {
   return (
     <Card className="glass animate-pulse">
       <CardContent className="p-6">
-      <div className="h-5 w-5 rounded bg-muted" />
-      <div className="mt-4 space-y-2">
-        <div className="h-8 w-16 rounded bg-muted" />
-        <div className="h-4 w-24 rounded bg-muted" />
-      </div>
+        <div className="h-5 w-5 rounded bg-muted" />
+        <div className="mt-4 space-y-2">
+          <div className="h-8 w-16 rounded bg-muted" />
+          <div className="h-4 w-24 rounded bg-muted" />
+        </div>
       </CardContent>
     </Card>
   );
@@ -143,18 +109,22 @@ function StatCard({
   return (
     <Card className="glass glass-hover transition-all">
       <CardContent className="p-6">
-      <div className="text-muted-foreground">{icon}</div>
-      <div className="mt-4">
-        <div className="text-3xl font-bold text-foreground tabular-nums">{value}</div>
-        <div className="mt-1 text-sm text-muted-foreground">{label}</div>
-        {sub && <div className="mt-2">{sub}</div>}
-      </div>
+        <div className="text-muted-foreground">{icon}</div>
+        <div className="mt-4">
+          <div className="text-3xl font-bold text-foreground tabular-nums">{value}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+          {sub && <div className="mt-2">{sub}</div>}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 export default function DashboardPage() {
+  const { dictionary, isRTL, formatDateTime, formatRelativeTime } = useLanguage();
+  const copy = dictionary.dashboard;
+  const common = dictionary.common;
+
   const [devices, setDevices] = useState<DevicesData | null>(null);
   const [hitlists, setHitlists] = useState<HitlistItem[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -177,7 +147,7 @@ export default function DashboardPage() {
         if (hlResp.success) setHitlists(hlResp.data);
         else if (!devResp.success) setError(hlResp.error);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load data");
+        if (!cancelled) setError(err instanceof Error ? err.message : copy.loadError);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -187,7 +157,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [copy.loadError]);
 
   const wsList = devices?.workstations ?? [];
   const activeWs = wsList.filter((w) => w.status === "ACTIVE").length;
@@ -212,11 +182,18 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
+  const statusLabel = (status: DeviceStatus) => {
+    if (status === "ACTIVE") return common.active;
+    if (status === "OFFLINE") return common.offline;
+    if (status === "PENDING") return common.pending;
+    return common.disabled;
+  };
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6" dir={isRTL ? "rtl" : "ltr"}>
       <div>
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">System overview and real-time device status</p>
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">{copy.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
       </div>
 
       {error && (
@@ -233,38 +210,38 @@ export default function DashboardPage() {
           <>
             <StatCard
               icon={<Monitor className="h-5 w-5" />}
-              label="Total Workstations"
+              label={copy.totalWorkstations}
               value={wsList.length}
               sub={
                 <div className="flex gap-3 flex-wrap">
-                  <Badge variant="success">{activeWs} active</Badge>
-                  <Badge variant="secondary">{offlineWs} offline</Badge>
-                  <Badge variant="warning">{pendingWs} pending</Badge>
+                  <Badge variant="success">{activeWs} {common.active.toLowerCase()}</Badge>
+                  <Badge variant="secondary">{offlineWs} {common.offline.toLowerCase()}</Badge>
+                  <Badge variant="warning">{pendingWs} {common.pending.toLowerCase()}</Badge>
                 </div>
               }
             />
             <StatCard
               icon={<Tablet className="h-5 w-5" />}
-              label="Total Tablets"
+              label={copy.totalTablets}
               value={devices?.tablets.length ?? 0}
             />
             <StatCard
               icon={<Link2 className="h-5 w-5" />}
-              label="Active Pairings"
+              label={copy.activePairings}
               value={activePairings}
               sub={
                 <span className="text-xs text-muted-foreground">
-                  {(devices?.pairings.length ?? 0) - activePairings} unpaired
+                  {(devices?.pairings.length ?? 0) - activePairings} {copy.unpaired}
                 </span>
               }
             />
             <StatCard
               icon={<FileText className="h-5 w-5" />}
-              label="Active Hitlists"
+              label={copy.activeHitlists}
               value={activeHitlists}
               sub={
                 <span className="text-xs text-muted-foreground">
-                  {hitlists?.length ?? 0} total
+                  {hitlists?.length ?? 0} {copy.total}
                 </span>
               }
             />
@@ -275,84 +252,84 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="glass xl:col-span-2">
           <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">Device Status Distribution</h2>
-          </div>
-          {loading ? (
-            <div className="h-48 animate-pulse rounded-lg bg-muted" />
-          ) : statusCounts.length === 0 ? (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              No devices registered
+            <div className="flex items-center gap-2 mb-5">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">{copy.deviceStatusDistribution}</h2>
             </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={statusCounts} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: "oklch(0.60 0.005 260)", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "oklch(0.60 0.005 260)", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "oklch(0.12 0.005 260 / 0.95)",
-                    border: "1px solid oklch(1 0 0 / 0.1)",
-                    borderRadius: "8px",
-                    color: "oklch(0.96 0.005 80)",
-                    fontSize: "12px",
-                  }}
-                  cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {statusCounts.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+            {loading ? (
+              <div className="h-48 animate-pulse rounded-lg bg-muted" />
+            ) : statusCounts.length === 0 ? (
+              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                {copy.noDevicesRegistered}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={statusCounts} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: "oklch(0.60 0.005 260)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "oklch(0.60 0.005 260)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "oklch(0.12 0.005 260 / 0.95)",
+                      border: "1px solid oklch(1 0 0 / 0.1)",
+                      borderRadius: "8px",
+                      color: "oklch(0.96 0.005 80)",
+                      fontSize: "12px",
+                    }}
+                    cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {statusCounts.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card className="glass">
           <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">System Status</h2>
-          </div>
-          {loading ? (
-            <div className="space-y-3">
-              {["s1", "s2", "s3", "s4"].map((k) => (
-                <div key={k} className="flex items-center justify-between animate-pulse">
-                  <div className="h-4 w-20 rounded bg-muted" />
-                  <div className="h-4 w-6 rounded bg-muted" />
-                </div>
-              ))}
+            <div className="flex items-center gap-2 mb-5">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">{common.systemStatus}</h2>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {statusCounts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No devices found</p>
-              ) : (
-                statusCounts.map(({ name, value, fill }) => (
-                  <div key={name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full" style={{ background: fill }} />
-                      <span className="text-sm text-muted-foreground">{name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground tabular-nums">{value}</span>
+            {loading ? (
+              <div className="space-y-3">
+                {["s1", "s2", "s3", "s4"].map((k) => (
+                  <div key={k} className="flex items-center justify-between animate-pulse">
+                    <div className="h-4 w-20 rounded bg-muted" />
+                    <div className="h-4 w-6 rounded bg-muted" />
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {statusCounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{copy.noDevicesFound}</p>
+                ) : (
+                  statusCounts.map(({ name, value, fill }) => (
+                    <div key={name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ background: fill }} />
+                        <span className="text-sm text-muted-foreground">{statusLabel(name as DeviceStatus)}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">{value}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -361,7 +338,7 @@ export default function DashboardPage() {
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-5">
             <Monitor className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold text-foreground">Workstation Health</h2>
+            <h2 className="text-sm font-semibold text-foreground">{copy.workstationHealth}</h2>
           </div>
 
           {loading ? (
@@ -377,40 +354,36 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : wsList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No workstations registered</p>
+            <p className="text-sm text-muted-foreground">{copy.noWorkstations}</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {wsList.map((workstation) => {
-                const statusMeta = workstationHealthMeta(workstation.status);
-
-                return (
-                  <Card key={workstation.id} className="glass glass-hover transition-all border-border/60">
-                    <CardContent className="p-5 space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{workstation.name}</p>
-                          <p className="text-xs text-muted-foreground mt-1">Operational status overview</p>
-                        </div>
-                        <Badge variant={statusMeta.badgeVariant} className="inline-flex items-center gap-1.5 shrink-0">
-                          <span className={cn("h-2 w-2 rounded-full", statusMeta.dotClass)} />
-                          {statusMeta.label}
-                        </Badge>
+              {wsList.map((workstation) => (
+                <Card key={workstation.id} className="glass glass-hover transition-all border-border/60">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{workstation.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{copy.operationalStatusOverview}</p>
                       </div>
+                      <Badge variant={workstation.status === "ACTIVE" ? "success" : workstation.status === "OFFLINE" ? "destructive" : workstation.status === "PENDING" ? "warning" : "secondary"} className="inline-flex items-center gap-1.5 shrink-0">
+                        <span className={cn("h-2 w-2 rounded-full", workstation.status === "ACTIVE" ? "bg-success" : workstation.status === "OFFLINE" ? "bg-destructive" : workstation.status === "PENDING" ? "bg-warning" : "bg-muted-foreground")} />
+                        {statusLabel(workstation.status)}
+                      </Badge>
+                    </div>
 
-                      <div className="rounded-lg border border-border bg-card/30 px-3 py-3 space-y-2">
-                        <div className="flex items-center justify-between text-sm gap-4">
-                          <span className="text-muted-foreground">Status</span>
-                          <span className="text-foreground font-medium">{statusMeta.label}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm gap-4">
-                          <span className="text-muted-foreground">Last seen</span>
-                          <span className="text-foreground font-medium">{timeAgo(workstation.lastSeenAt)}</span>
-                        </div>
+                    <div className="rounded-lg border border-border bg-card/30 px-3 py-3 space-y-2">
+                      <div className="flex items-center justify-between text-sm gap-4">
+                        <span className="text-muted-foreground">{common.status}</span>
+                        <span className="text-foreground font-medium">{statusLabel(workstation.status)}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      <div className="flex items-center justify-between text-sm gap-4">
+                        <span className="text-muted-foreground">{common.lastSeen}</span>
+                        <span className="text-foreground font-medium force-ltr">{formatRelativeTime(workstation.lastSeenAt)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
@@ -418,59 +391,64 @@ export default function DashboardPage() {
 
       <Card className="glass">
         <CardContent className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Recent Activity</h2>
-        </div>
-        {loading ? (
-          <div className="space-y-3">
-            {["activity-1", "activity-2", "activity-3", "activity-4", "activity-5"].map((key) => (
-              <div key={key} className="flex items-center justify-between animate-pulse py-2">
-                <div className="h-4 w-48 rounded bg-muted" />
-                <div className="h-4 w-24 rounded bg-muted" />
-              </div>
-            ))}
+          <div className="flex items-center gap-2 mb-5">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold text-foreground">{copy.recentActivity}</h2>
           </div>
-        ) : recentActivity.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hitlists found</p>
-        ) : (
-          <div className="divide-y divide-border">
-            {recentActivity.map((h) => {
-              const latestEntries = h.versions[0]?.entries?.length ?? 0;
-              return (
-                <div key={h.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <CheckCircle
-                      className={cn(
-                        "h-4 w-4 shrink-0",
-                        h.status === "ACTIVE" ? "text-success" : "text-muted-foreground",
-                      )}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{h.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        v{h.currentVersionNumber} · {latestEntries} entries ·{" "}
-                        <Badge
-                          variant={
-                            h.status === "ACTIVE" ? "success" :
-                            h.status === "DRAFT" ? "warning" :
-                            "secondary"
-                          }
-                          className="capitalize"
-                        >
-                          {h.status.toLowerCase()}
-                        </Badge>
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0 ml-4">
-                    {formatDate(h.createdAt)}
-                  </span>
+          {loading ? (
+            <div className="space-y-3">
+              {["activity-1", "activity-2", "activity-3", "activity-4", "activity-5"].map((key) => (
+                <div key={key} className="flex items-center justify-between animate-pulse py-2">
+                  <div className="h-4 w-48 rounded bg-muted" />
+                  <div className="h-4 w-24 rounded bg-muted" />
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{copy.noHitlists}</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {recentActivity.map((h) => {
+                const latestEntries = h.versions[0]?.entries?.length ?? 0;
+                return (
+                  <div key={h.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <CheckCircle
+                        className={cn(
+                          "h-4 w-4 shrink-0",
+                          h.status === "ACTIVE" ? "text-success" : "text-muted-foreground",
+                        )}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{h.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          v{h.currentVersionNumber} · {latestEntries} {copy.entries} ·{" "}
+                          <Badge
+                            variant={
+                              h.status === "ACTIVE" ? "success" :
+                              h.status === "DRAFT" ? "warning" :
+                              "secondary"
+                            }
+                            className="capitalize"
+                          >
+                            {h.status === "ACTIVE" ? common.active.toLowerCase() : h.status === "DRAFT" ? common.draft.toLowerCase() : common.archived.toLowerCase()}
+                          </Badge>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 ml-4 force-ltr">
+                      {formatDateTime(h.createdAt, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,28 +51,9 @@ interface DevicesData {
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
 
-function statusConfig(status: string) {
-  const map: Record<string, { label: string; color: string; dotColor: string; icon: typeof Wifi }> = {
-    ACTIVE: { label: "Online", color: "text-success", dotColor: "bg-success", icon: Wifi },
-    OFFLINE: { label: "Offline", color: "text-destructive", dotColor: "bg-destructive", icon: WifiOff },
-    PENDING: { label: "Pending", color: "text-warning", dotColor: "bg-warning", icon: Clock },
-    DISABLED: { label: "Disabled", color: "text-muted-foreground", dotColor: "bg-muted-foreground", icon: WifiOff },
-  };
-  return map[status] ?? map.OFFLINE;
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "Never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 export default function CamerasPage() {
+  const { dictionary, isRTL, formatRelativeTime } = useLanguage();
+  const common = dictionary.common;
   const [data, setData] = useState<DevicesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,9 +94,19 @@ export default function CamerasPage() {
     return tablets.find((t) => t.id === pairing.tabletId);
   }
 
+  function statusConfig(status: string) {
+    const map: Record<string, { label: string; color: string; icon: typeof Wifi }> = {
+      ACTIVE: { label: common.online, color: "text-success", icon: Wifi },
+      OFFLINE: { label: common.offline, color: "text-destructive", icon: WifiOff },
+      PENDING: { label: common.pending, color: "text-warning", icon: Clock },
+      DISABLED: { label: common.disabled, color: "text-muted-foreground", icon: WifiOff },
+    };
+    return map[status] ?? map.OFFLINE;
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Cameras</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -132,44 +124,14 @@ export default function CamerasPage() {
           )}
         >
           <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-          Refresh
+          {common.refresh}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="glass rounded-xl">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-2.5 rounded-lg bg-card">
-              <Camera className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Workstations</p>
-              <p className="text-2xl font-semibold text-foreground tabular-nums">{workstations.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="glass rounded-xl">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-2.5 rounded-lg bg-card">
-              <Wifi className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Online</p>
-              <p className="text-2xl font-semibold text-success tabular-nums">{activeCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="glass rounded-xl">
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="p-2.5 rounded-lg bg-card">
-              <WifiOff className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Offline</p>
-              <p className="text-2xl font-semibold text-destructive tabular-nums">{offlineCount}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard icon={Camera} label="Total Workstations" value={workstations.length} />
+        <StatCard icon={Wifi} label={common.online} value={activeCount} valueClass="text-success" iconClass="text-success" />
+        <StatCard icon={WifiOff} label={common.offline} value={offlineCount} valueClass="text-destructive" iconClass="text-destructive" />
       </div>
 
       {error && (
@@ -190,7 +152,7 @@ export default function CamerasPage() {
           </div>
           <h2 className="text-lg font-medium text-foreground mb-2">No Workstations</h2>
           <p className="text-sm text-muted-foreground max-w-md">
-            Register a workstation to begin monitoring camera feeds. Workstations connect via the device provisioning API.
+            Register a workstation to begin monitoring camera feeds.
           </p>
         </div>
       ) : (
@@ -223,11 +185,11 @@ export default function CamerasPage() {
                   </div>
 
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="font-mono">{ws.deviceId}</span>
+                    <span className="font-mono force-ltr">{ws.deviceId}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Last seen: {timeAgo(ws.lastSeenAt)}</span>
+                  <div className="flex items-center justify-between text-xs gap-3">
+                    <span className="text-muted-foreground">{common.lastSeen}: <span className="force-ltr">{formatRelativeTime(ws.lastSeenAt)}</span></span>
                     {linkedTablet && (
                       <span className="flex items-center gap-1 text-accent">
                         <MonitorSmartphone className="h-3 w-3" />
@@ -246,5 +208,33 @@ export default function CamerasPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  valueClass,
+  iconClass,
+}: {
+  icon: typeof Camera;
+  label: string;
+  value: number;
+  valueClass?: string;
+  iconClass?: string;
+}) {
+  return (
+    <Card className="glass rounded-xl">
+      <CardContent className="p-5 flex items-center gap-4">
+        <div className="p-2.5 rounded-lg bg-card">
+          <Icon className={cn("h-5 w-5 text-muted-foreground", iconClass)} />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className={cn("text-2xl font-semibold text-foreground tabular-nums", valueClass)}>{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

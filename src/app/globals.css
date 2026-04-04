@@ -124,10 +124,23 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html[dir="rtl"] body {
+    text-align: right;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     background-image: var(--page-glow);
     background-attachment: fixed;
+  }
+
+  html[dir="rtl"] input,
+  html[dir="rtl"] textarea {
+    text-align: right;
+  }
+
+  html[dir="rtl"] select {
+    text-align: right;
   }
 }
 
@@ -174,6 +187,11 @@
 }
 
 @layer base {
+  .force-ltr {
+    direction: ltr;
+    unicode-bidi: plaintext;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
