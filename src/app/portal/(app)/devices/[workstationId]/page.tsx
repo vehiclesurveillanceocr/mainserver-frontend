@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 type DeviceStatus = "PENDING" | "ACTIVE" | "OFFLINE" | "DISABLED";
-type CameraStatus = "ONLINE" | "OFFLINE" | "DEGRADED" | "MAINTENANCE";
 type TabletSignal = "STRONG" | "FAIR" | "WEAK" | "DISCONNECTED";
 type GeoStatus = "LOCKED" | "SEARCHING" | "OFFLINE";
 
@@ -73,24 +72,12 @@ interface TabletStatus {
   lastHeartbeatAt: string | null;
 }
 
-interface CameraInfo {
-  id: string;
-  workstationId: string;
-  name: string;
-  position: string;
-  status: CameraStatus;
-  fps: number;
-  resolution: string;
-  lastFrameAt: string | null;
-  healthNote: string;
-}
-
 interface WorkstationDetail {
   workstation: Workstation;
   tablet: Tablet | null;
   metrics: WorkstationMetrics;
   tabletStatus: TabletStatus;
-  cameras: CameraInfo[];
+  cameras: { id: string }[];
 }
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
@@ -144,12 +131,6 @@ export default function WorkstationDetailPage({
     status === "OFFLINE" ? common.offline :
     status === "PENDING" ? common.pending :
     common.disabled;
-
-  const cameraLabel = (status: CameraStatus) =>
-    status === "ONLINE" ? common.online :
-    status === "OFFLINE" ? common.offline :
-    status === "DEGRADED" ? common.degraded :
-    common.maintenance;
 
   if (loading) {
     return (
@@ -278,48 +259,6 @@ export default function WorkstationDetailPage({
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">{copy.cameraGrid}</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {copy.cameraGridSubtitle}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {detail.cameras.map((camera) => (
-            <Card key={camera.id} className="glass rounded-2xl border-border/70">
-              <CardContent className="p-5 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-foreground">{camera.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{camera.position}</p>
-                  </div>
-                  <Badge variant={camera.status === "ONLINE" ? "success" : camera.status === "OFFLINE" ? "destructive" : camera.status === "DEGRADED" ? "warning" : "secondary"}>{cameraLabel(camera.status)}</Badge>
-                </div>
-
-                <div className="aspect-video rounded-xl border border-border bg-card/30 flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <Camera className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-xs force-ltr">{camera.resolution}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <InfoTile icon={Camera} label="FPS" value={`${camera.fps}`} />
-                  <InfoTile icon={Wifi} label={copy.lastFrame} value={formatRelativeTime(camera.lastFrameAt)} />
-                </div>
-
-                <div className="rounded-xl border border-border bg-card/30 p-3">
-                  <p className="text-xs text-muted-foreground">{copy.healthNote}</p>
-                  <p className="text-sm text-foreground mt-1">{camera.healthNote}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </div>
     </div>
   );
