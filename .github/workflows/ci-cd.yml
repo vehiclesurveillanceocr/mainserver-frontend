@@ -64,23 +64,23 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_APP_DIR: ${{ secrets.EC2_APP_DIR }}
-          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
         run: |
-          ssh "${EC2_USER}@${EC2_HOST}" \
+          tar \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude=".next" \
+            --exclude="node_modules" \
+            --exclude="logs" \
+            --exclude="*.log" \
+            --exclude="tsconfig.tsbuildinfo" \
+            -czf - . | ssh "${EC2_USER}@${EC2_HOST}" \
             "set -euo pipefail && \
-            if [ -d '${EC2_APP_DIR}/.git' ]; then \
-              cd '${EC2_APP_DIR}'; \
-            else \
-              mkdir -p '${EC2_APP_DIR}'; \
-              if [ \"\$(ls -A '${EC2_APP_DIR}' 2>/dev/null)\" ]; then \
-                echo 'EC2_APP_DIR exists but is not a git repository: ${EC2_APP_DIR}'; \
-                exit 1; \
-              fi; \
-              git clone --branch main '${REPO_URL}' '${EC2_APP_DIR}'; \
-              cd '${EC2_APP_DIR}'; \
-            fi && \
-            git fetch origin main && \
-            git checkout main && \
-            git pull --ff-only origin main && \
+            mkdir -p '${EC2_APP_DIR}' && \
+            tmp_dir=\"\$(mktemp -d)\" && \
+            trap 'rm -rf \"\$tmp_dir\"' EXIT && \
+            tar -xzf - -C \"\$tmp_dir\" && \
+            find '${EC2_APP_DIR}' -mindepth 1 -maxdepth 1 ! -name 'logs' ! -name '.next-start.pid' -exec rm -rf {} + && \
+            cp -a \"\$tmp_dir\"/. '${EC2_APP_DIR}'/ && \
+            cd '${EC2_APP_DIR}' && \
             chmod +x deploy_nohup.sh && \
             ./deploy_nohup.sh"

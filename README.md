@@ -47,7 +47,7 @@ pnpm dev
 This repo now includes a GitHub Actions workflow at `.github/workflows/ci-cd.yml`.
 
 - On every push and pull request, it runs `npm ci`, `npm run typecheck`, and `npm run build`
-- On pushes to `main`, it SSHes into your EC2 server, pulls the latest code, and runs `./deploy_nohup.sh`
+- On pushes to `main`, it sends the latest app files to your EC2 server over SSH and runs `./deploy_nohup.sh`
 - This setup does not use Docker
 
 ### GitHub secrets to add
@@ -55,19 +55,15 @@ This repo now includes a GitHub Actions workflow at `.github/workflows/ci-cd.yml
 - `EC2_HOST`: public IP or DNS of your EC2 instance
 - `EC2_USER`: SSH user, for example `ubuntu`
 - `EC2_SSH_KEY`: private key content for the EC2 server
-- `EC2_APP_DIR`: absolute path where the repo should live on EC2, for example `/home/ubuntu/surveillance-main-server-frontend`
+- `EC2_APP_DIR`: absolute path where the app files should live on EC2, for example `/home/ubuntu/surveillance-main-server-frontend`
 
 ### One-time EC2 preparation
 
-You can clone this repo on the EC2 server once and keep it on the branch you deploy from:
+Create the target directory on the EC2 server and make sure your SSH user can write to it:
 
 ```bash
-git clone https://github.com/Indominus-labs-org/surveillance-main-server-frontend.git
-cd surveillance-main-server-frontend
-git checkout main
-chmod +x deploy_nohup.sh
+mkdir -p /home/ubuntu/surveillance-main-server-frontend
+cd /home/ubuntu/surveillance-main-server-frontend
 ```
 
 After that, every push to `main` will build in GitHub Actions and deploy on the EC2 machine through SSH.
-
-If `EC2_APP_DIR` does not contain the repo yet, the workflow will clone it there automatically on the first deploy.
