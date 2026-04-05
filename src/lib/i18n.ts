@@ -215,7 +215,7 @@ export const translations = {
       createHitlist: "Create Hitlist",
       name: "Name",
       descriptionOptional: "Description (optional)",
-      namePlaceholder: "e.g. Stolen Vehicles Q1",
+      namePlaceholder: "e.g. Hitlist Vehicles Q1",
       descriptionPlaceholder: "Brief description",
       creating: "Creating...",
       noHitlists: "No Hitlists",

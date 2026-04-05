@@ -363,7 +363,7 @@ export default function WatchlistPage() {
                         rows={5}
                         value={versionEntries}
                         onChange={(e) => setVersionEntries(e.target.value)}
-                        placeholder={"KA01AB1234, IN, HIGH, Stolen vehicle\nMH02CD5678, IN, MEDIUM, Wanted suspect"}
+                        placeholder={"KA01AB1234, IN, HIGH, Hitlist vehicle detected\nMH02CD5678, IN, MEDIUM, Hitlist vehicle detected"}
                         className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring font-mono resize-none"
                       />
                     </div>
