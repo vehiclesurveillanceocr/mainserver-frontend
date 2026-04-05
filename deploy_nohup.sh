@@ -2,57 +2,72 @@
 
 set -euo pipefail
 
+# ==============================
+# Load NVM (safe for CI shells)
+# ==============================
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+if ! command -v nvm >/dev/null 2>&1; then
+  echo "❌ NVM not found. Install it first."
+  exit 1
+fi
+
+# Ensure Node 20 is installed & used
+nvm install 20 >/dev/null
+nvm use 20 >/dev/null
+
+# ==============================
+# App Config
+# ==============================
 APP_NAME="surveillance-main-server-frontend"
-REQUIRED_NODE_MAJOR=20
-REQUIRED_NODE_MINOR=9
 PORT="${PORT:-3000}"
 LOG_DIR="${LOG_DIR:-./logs}"
 PID_FILE="${PID_FILE:-./.next-start.pid}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/nohup.log}"
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is not installed. Install Node.js ${REQUIRED_NODE_MAJOR}.${REQUIRED_NODE_MINOR}+ and retry."
-  exit 1
-fi
-
-NODE_VERSION_RAW="$(node -v)"
-NODE_VERSION="${NODE_VERSION_RAW#v}"
-NODE_MAJOR="${NODE_VERSION%%.*}"
-NODE_REMAINDER="${NODE_VERSION#*.}"
-NODE_MINOR="${NODE_REMAINDER%%.*}"
-
-if (( NODE_MAJOR < REQUIRED_NODE_MAJOR )) || (( NODE_MAJOR == REQUIRED_NODE_MAJOR && NODE_MINOR < REQUIRED_NODE_MINOR )); then
-  echo "Node.js ${REQUIRED_NODE_MAJOR}.${REQUIRED_NODE_MINOR}+ is required, but found ${NODE_VERSION_RAW}."
-  echo "Install a newer Node.js version on the server, then run this script again."
-  exit 1
-fi
-
 mkdir -p "$LOG_DIR"
 
-echo "Installing dependencies..."
+echo "🚀 Deploying $APP_NAME..."
+
+# ==============================
+# Install Dependencies
+# ==============================
+echo "📦 Installing dependencies..."
 if [[ -f package-lock.json ]]; then
   npm ci
 else
   npm install
 fi
 
-echo "Building application..."
+# ==============================
+# Build
+# ==============================
+echo "🏗️ Building application..."
 npm run build
 
+# ==============================
+# Stop old process
+# ==============================
 if [[ -f "$PID_FILE" ]]; then
   OLD_PID="$(cat "$PID_FILE")"
   if ps -p "$OLD_PID" >/dev/null 2>&1; then
-    echo "Stopping existing process $OLD_PID..."
+    echo "🛑 Stopping old process ($OLD_PID)..."
     kill "$OLD_PID"
     sleep 2
   fi
   rm -f "$PID_FILE"
 fi
 
-echo "Starting $APP_NAME on port $PORT..."
-nohup npx next start -p "$PORT" >>"$LOG_FILE" 2>&1 &
+# ==============================
+# Start new process
+# ==============================
+echo "▶️ Starting app on port $PORT..."
+
+nohup node_modules/.bin/next start -p "$PORT" >>"$LOG_FILE" 2>&1 &
+
 NEW_PID=$!
 echo "$NEW_PID" >"$PID_FILE"
 
-echo "Started with PID $NEW_PID"
-echo "Log file: $LOG_FILE"
+echo "✅ Started with PID $NEW_PID"
+echo "📄 Logs: $LOG_FILE"

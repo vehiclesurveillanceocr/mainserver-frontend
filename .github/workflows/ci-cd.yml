@@ -76,8 +76,7 @@ jobs:
             -czf - . | ssh "${EC2_USER}@${EC2_HOST}" \
             "set -euo pipefail && \
             mkdir -p '${EC2_APP_DIR}' && \
-            tmp_dir=\"\$(mktemp -d)\" && \
-            trap 'rm -rf \"\$tmp_dir\"' EXIT && \
+            tmp_dir=\$(mktemp -d) && \
             tar -xzf - -C \"\$tmp_dir\" && \
             find '${EC2_APP_DIR}' -mindepth 1 -maxdepth 1 ! -name 'logs' ! -name '.next-start.pid' -exec rm -rf {} + && \
             cp -a \"\$tmp_dir\"/. '${EC2_APP_DIR}'/ && \
