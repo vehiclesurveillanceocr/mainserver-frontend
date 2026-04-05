@@ -66,4 +66,6 @@ mkdir -p /home/ubuntu/surveillance-main-server-frontend
 cd /home/ubuntu/surveillance-main-server-frontend
 ```
 
+Install Node.js `20.9+` on the EC2 instance before running `./deploy_nohup.sh`. This project is built with Next.js 16 and will not build on older Node versions such as Node 12.
+
 After that, every push to `main` will build in GitHub Actions and deploy on the EC2 machine through SSH.
