@@ -2,12 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -16,50 +13,39 @@ concurrency:
 
 jobs:
   ci:
-    name: Build And Verify
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build application
-        run: npm run build
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
 
   deploy:
-    name: Deploy To EC2
     runs-on: ubuntu-latest
     needs: ci
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    environment: production
+    if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Start SSH agent
+      - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Add EC2 host key
+      - name: Add known hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy application on EC2
+      - name: Deploy
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
@@ -68,18 +54,26 @@ jobs:
           tar \
             --exclude=".git" \
             --exclude=".github" \
-            --exclude=".next" \
             --exclude="node_modules" \
+            --exclude=".next" \
             --exclude="logs" \
-            --exclude="*.log" \
-            --exclude="tsconfig.tsbuildinfo" \
-            -czf - . | ssh "${EC2_USER}@${EC2_HOST}" \
-            "set -euo pipefail && \
-            mkdir -p '${EC2_APP_DIR}' && \
-            tmp_dir=\$(mktemp -d) && \
-            tar -xzf - -C \"\$tmp_dir\" && \
-            find '${EC2_APP_DIR}' -mindepth 1 -maxdepth 1 ! -name 'logs' ! -name '.next-start.pid' -exec rm -rf {} + && \
-            cp -a \"\$tmp_dir\"/. '${EC2_APP_DIR}'/ && \
-            cd '${EC2_APP_DIR}' && \
-            chmod +x deploy_nohup.sh && \
-            ./deploy_nohup.sh"
+            -czf - . | ssh -o IdentitiesOnly=yes "${EC2_USER}@${EC2_HOST}" "
+              set -euo pipefail
+
+              mkdir -p '${EC2_APP_DIR}'
+              tmp_dir=\$(mktemp -d)
+
+              tar -xzf - -C \"\$tmp_dir\"
+
+              # SAFE CLEAN (won’t touch .ssh or system files)
+              find '${EC2_APP_DIR}' -mindepth 1 -maxdepth 1 \
+                ! -name 'logs' \
+                ! -name '.next-start.pid' \
+                -exec rm -rf {} +
+
+              cp -a \"\$tmp_dir\"/. '${EC2_APP_DIR}'/
+
+              cd '${EC2_APP_DIR}'
+              chmod +x deploy_nohup.sh
+              ./deploy_nohup.sh
+            "

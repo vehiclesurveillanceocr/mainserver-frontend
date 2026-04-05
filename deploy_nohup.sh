@@ -3,17 +3,17 @@
 set -euo pipefail
 
 # ==============================
-# Load NVM (safe for CI shells)
+# Load NVM safely
 # ==============================
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
 if ! command -v nvm >/dev/null 2>&1; then
-  echo "❌ NVM not found. Install it first."
+  echo "❌ NVM not installed"
   exit 1
 fi
 
-# Ensure Node 20 is installed & used
+# Ensure Node 20
 nvm install 20 >/dev/null
 nvm use 20 >/dev/null
 
@@ -47,7 +47,7 @@ echo "🏗️ Building application..."
 npm run build
 
 # ==============================
-# Stop old process
+# Stop Old Process
 # ==============================
 if [[ -f "$PID_FILE" ]]; then
   OLD_PID="$(cat "$PID_FILE")"
@@ -60,7 +60,7 @@ if [[ -f "$PID_FILE" ]]; then
 fi
 
 # ==============================
-# Start new process
+# Start App
 # ==============================
 echo "▶️ Starting app on port $PORT..."
 
