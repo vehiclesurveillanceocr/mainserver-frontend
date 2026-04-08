@@ -47,25 +47,32 @@ pnpm dev
 This repo now includes a GitHub Actions workflow at `.github/workflows/ci-cd.yml`.
 
 - On every push and pull request, it runs `npm ci`, `npm run typecheck`, and `npm run build`
-- On pushes to `main`, it sends the latest app files to your EC2 server over SSH and runs `./deploy_nohup.sh`
-- This setup does not use Docker
+- On pushes to `main`, it builds a Docker image, pushes it to Docker Hub, and restarts the container on your EC2 server
+- The production container listens on port `3000`
 
 ### GitHub secrets to add
 
+- `DOCKER_USERNAME`: Docker Hub username
+- `DOCKER_PASSWORD`: Docker Hub access token or password
 - `EC2_HOST`: public IP or DNS of your EC2 instance
 - `EC2_USER`: SSH user, for example `ubuntu`
 - `EC2_SSH_KEY`: private key content for the EC2 server
-- `EC2_APP_DIR`: absolute path where the app files should live on EC2, for example `/home/ubuntu/surveillance-main-server-frontend`
+- `NEXT_PUBLIC_WS_URL`: websocket URL for runtime clients, if needed
 
 ### One-time EC2 preparation
 
-Create the target directory on the EC2 server and make sure your SSH user can write to it:
+Install Docker on the EC2 server and make sure your SSH user can run Docker via `sudo`:
 
 ```bash
-mkdir -p /home/ubuntu/surveillance-main-server-frontend
-cd /home/ubuntu/surveillance-main-server-frontend
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo systemctl enable --now docker
 ```
 
-Install Node.js `20.9+` on the EC2 instance before running `./deploy_nohup.sh`. This project is built with Next.js 16 and will not build on older Node versions such as Node 12.
+### Local Docker run
 
-After that, every push to `main` will build in GitHub Actions and deploy on the EC2 machine through SSH.
+```bash
+docker compose up --build
+```
+
+After that, every push to `main` will build in GitHub Actions, push the image to Docker Hub, and deploy it on the EC2 machine.

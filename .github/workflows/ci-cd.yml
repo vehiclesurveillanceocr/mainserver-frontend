@@ -1,8 +1,8 @@
-name: CI/CD
+name: Docker Deploy
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -31,49 +31,66 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     if: github.ref == 'refs/heads/main'
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/surveillance-main-server-frontend
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Docker login
+        uses: docker/login-action@v3
         with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Add known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Deploy
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_APP_DIR: ${{ secrets.EC2_APP_DIR }}
-        run: |
-          tar \
-            --exclude=".git" \
-            --exclude=".github" \
-            --exclude="node_modules" \
-            --exclude=".next" \
-            --exclude="logs" \
-            -czf - . | ssh -o IdentitiesOnly=yes "${EC2_USER}@${EC2_HOST}" "
-              set -euo pipefail
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          no-cache: true
+          build-args: |
+            NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-              mkdir -p '${EC2_APP_DIR}'
-              tmp_dir=\$(mktemp -d)
+      - name: Verify pushed image
+        run: docker pull "${IMAGE_NAME}:${GITHUB_SHA}"
 
-              tar -xzf - -C \"\$tmp_dir\"
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
 
-              # SAFE CLEAN (won’t touch .ssh or system files)
-              find '${EC2_APP_DIR}' -mindepth 1 -maxdepth 1 \
-                ! -name 'logs' \
-                ! -name '.next-start.pid' \
-                -exec rm -rf {} +
+            CONTAINER_NAME="surveillance-main-server-frontend"
+            IMAGE_NAME="${{ env.IMAGE_NAME }}:${{ github.sha }}"
 
-              cp -a \"\$tmp_dir\"/. '${EC2_APP_DIR}'/
+            echo "Logging into Docker Hub..."
+            echo '${{ secrets.DOCKER_PASSWORD }}' | sudo docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin
 
-              cd '${EC2_APP_DIR}'
-              chmod +x deploy_nohup.sh
-              ./deploy_nohup.sh
-            "
+            echo "Stopping old container if it exists..."
+            sudo docker stop "$CONTAINER_NAME" || true
+            sudo docker rm "$CONTAINER_NAME" || true
+
+            echo "Pulling latest image..."
+            sudo docker pull "$IMAGE_NAME"
+
+            echo "Starting updated container..."
+            sudo docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e NEXT_PUBLIC_WS_URL='${{ secrets.NEXT_PUBLIC_WS_URL }}' \
+              "$IMAGE_NAME"
+
+            echo "Cleaning unused images..."
+            sudo docker image prune -af
