@@ -89,6 +89,9 @@ export interface MatchEvent {
   createdAt: string;
   detection: {
     plate: string;
+    secondaryPlate: string | null;
+    code: string | null;
+    emirate: string | null;
     country: string;
     make: string;
     model: string;
@@ -97,6 +100,12 @@ export interface MatchEvent {
     confidence: number;
     occurredAt: string;
     snapshotUrl: string | null;
+    plateImageUrl: string | null;
+    vehicleImageUrl: string | null;
+    cameraName: string | null;
+    heightCharacter: number | null;
+    scannedBy: string | null;
+    latitude: number | null;
   } | null;
   workstation: {
     name: string;

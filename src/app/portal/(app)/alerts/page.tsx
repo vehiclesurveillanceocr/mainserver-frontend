@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   Bell,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Eye,
   Loader2,
   Radio,
@@ -28,6 +30,9 @@ type ActionStatus = Exclude<AlertStatus, "PENDING">;
 
 interface MatchEventDetection {
   plate: string;
+  secondaryPlate: string | null;
+  code: string | null;
+  emirate: string | null;
   country: string;
   make: string;
   model: string;
@@ -36,6 +41,12 @@ interface MatchEventDetection {
   confidence: number;
   occurredAt: string;
   snapshotUrl: string | null;
+  plateImageUrl: string | null;
+  vehicleImageUrl: string | null;
+  cameraName: string | null;
+  heightCharacter: number | null;
+  scannedBy: string | null;
+  latitude: number | null;
 }
 
 interface MatchEventWorkstation {
@@ -97,6 +108,40 @@ function getVehicleSummary(detection: MatchEventDetection | null, unknownVehicle
   return parts.length > 0 ? parts.join(" · ") : unknownVehicle;
 }
 
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm text-foreground break-words">{value}</p>
+    </div>
+  );
+}
+
+function ImagePanel({
+  label,
+  src,
+  fallback,
+}: {
+  label: string;
+  src: string | null;
+  fallback: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/30">
+        {src ? (
+          <img src={src} alt={label} className="h-28 w-full object-cover" />
+        ) : (
+          <div className="flex h-28 items-center justify-center text-sm text-muted-foreground">
+            {fallback}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmptyState() {
   const { dictionary } = useLanguage();
   const copy = dictionary.alerts;
@@ -142,7 +187,7 @@ function EmptyState() {
 }
 
 export default function AlertsPage() {
-  const { dictionary, isRTL, formatRelativeTime } = useLanguage();
+  const { dictionary, isRTL, formatDate, formatRelativeTime, formatTime } = useLanguage();
   const copy = dictionary.alerts;
 
   const statusConfig: Record<Exclude<MatchStatus, "ALL">, { label: string; color: string; icon: typeof Bell }> = {
@@ -182,6 +227,7 @@ export default function AlertsPage() {
   const [total, setTotal] = useState(0);
   const [actionState, setActionState] = useState<{ eventId: string; nextStatus: ActionStatus; note: string } | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
   const hasMore = events.length < total;
 
@@ -243,6 +289,7 @@ export default function AlertsPage() {
 
   useEffect(() => {
     setActionState(null);
+    setExpandedIds([]);
     void loadInitial(activeTab);
   }, [activeTab, loadInitial]);
 
@@ -293,6 +340,12 @@ export default function AlertsPage() {
     } finally {
       setSubmittingId(null);
     }
+  }
+
+  function toggleExpanded(eventId: string) {
+    setExpandedIds((current) =>
+      current.includes(eventId) ? current.filter((id) => id !== eventId) : [...current, eventId],
+    );
   }
 
   return (
@@ -356,19 +409,22 @@ export default function AlertsPage() {
               <EmptyState />
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
                   {events.map((event) => {
                     const detection = event.detection;
                     const status = statusConfig[event.alertStatus];
                     const StatusIcon = status.icon;
                     const priority = event.hitlistEntry?.priority?.toUpperCase() ?? null;
                     const isActionOpen = actionState?.eventId === event.id;
+                    const isExpanded = expandedIds.includes(event.id);
+                    const ExpandIcon = isExpanded ? ChevronUp : ChevronDown;
 
                     return (
-                      <Card key={event.id} className="glass glass-hover transition-all rounded-xl border-border/60">
+                      <Card key={event.id} className="glass glass-hover self-start transition-all rounded-xl border-border/60">
                         <CardContent className="p-5 space-y-4">
-                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0 space-y-3">
+                          <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0 flex-1 space-y-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-2xl font-bold font-mono tracking-wide text-foreground truncate force-ltr">
                                   {detection?.plate ?? event.hitlistEntry?.plateOriginal ?? copy.unknownPlate}
@@ -387,7 +443,7 @@ export default function AlertsPage() {
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
                                 <div>
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.vehicle}</p>
                                   <p className="mt-1 text-foreground">{getVehicleSummary(detection, copy.unknownVehicle)}</p>
@@ -395,6 +451,18 @@ export default function AlertsPage() {
                                 <div>
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.workstation}</p>
                                   <p className="mt-1 text-foreground">{event.workstation?.name ?? copy.unknownWorkstation}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.time}</p>
+                                  <p className="mt-1 text-foreground">
+                                    {detection?.occurredAt ? formatTime(detection.occurredAt) : dictionary.common.notAvailable}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.confidence}</p>
+                                  <p className="mt-1 text-foreground">
+                                    {detection ? `${Math.round(detection.confidence * 100)}%` : dictionary.common.notAvailable}
+                                  </p>
                                 </div>
                               </div>
 
@@ -411,11 +479,60 @@ export default function AlertsPage() {
                                   <p className="mt-1 text-sm text-muted-foreground">{event.note}</p>
                                 </div>
                               )}
+                              </div>
+
+                              <div className="flex shrink-0 items-start justify-between gap-3 sm:flex-col sm:items-end">
+                                <div className="text-xs text-muted-foreground force-ltr">
+                                  {formatRelativeTime(event.createdAt)}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleExpanded(event.id)}
+                                  className="glass glass-hover text-xs"
+                                  aria-expanded={isExpanded}
+                                >
+                                  <ExpandIcon className="h-3.5 w-3.5" />
+                                  {isExpanded ? copy.hideDetails : copy.showDetails}
+                                </Button>
+                              </div>
                             </div>
 
-                            <div className="text-xs text-muted-foreground shrink-0 force-ltr">
-                              {formatRelativeTime(event.createdAt)}
-                            </div>
+                            {isExpanded && (
+                              <div className="space-y-4 rounded-xl border border-border/60 bg-background/30 p-4">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  <ImagePanel
+                                    label={copy.plateImage}
+                                    src={detection?.plateImageUrl ?? null}
+                                    fallback={copy.noImage}
+                                  />
+                                  <ImagePanel
+                                    label={copy.vehicleImage}
+                                    src={detection?.vehicleImageUrl ?? detection?.snapshotUrl ?? null}
+                                    fallback={copy.noImage}
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.details}</p>
+                                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                                    <DetailItem label={dictionary.common.plate} value={detection?.plate ?? copy.unknownPlate} />
+                                    <DetailItem label={copy.secondaryPlate} value={detection?.secondaryPlate ?? dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.code} value={detection?.code ?? dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.emirate} value={detection?.emirate ?? dictionary.common.notAvailable} />
+                                    <DetailItem label={dictionary.common.country} value={detection?.country || dictionary.common.notAvailable} />
+                                    <DetailItem label={dictionary.common.snapshot} value={detection?.snapshotUrl ? dictionary.common.available : dictionary.common.unavailable} />
+                                    <DetailItem label={copy.cameraName} value={detection?.cameraName ?? event.workstation?.name ?? copy.unknownWorkstation} />
+                                    <DetailItem label={copy.date} value={detection?.occurredAt ? formatDate(detection.occurredAt) : dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.time} value={detection?.occurredAt ? formatTime(detection.occurredAt) : dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.heightCharacter} value={detection?.heightCharacter != null ? String(detection.heightCharacter) : dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.scannedBy} value={detection?.scannedBy ?? dictionary.common.notAvailable} />
+                                    <DetailItem label={copy.latitude} value={detection?.latitude != null ? detection.latitude.toFixed(6) : dictionary.common.notAvailable} />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex flex-wrap gap-2">

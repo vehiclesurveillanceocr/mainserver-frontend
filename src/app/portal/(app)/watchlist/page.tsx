@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,112 @@ interface Hitlist {
 
 type ApiResp<T> = { success: true; data: T } | { success: false; error: string };
 
+type UploadEntry = {
+  plateOriginal: string;
+  countryOrRegion?: string;
+  priority?: string;
+  reasonSummary?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+};
+
+const HEADER_ALIASES: Record<string, keyof UploadEntry> = {
+  plate: "plateOriginal",
+  platenumber: "plateOriginal",
+  plateno: "plateOriginal",
+  registrationnumber: "plateOriginal",
+  country: "countryOrRegion",
+  countryorregion: "countryOrRegion",
+  region: "countryOrRegion",
+  priority: "priority",
+  severity: "priority",
+  reason: "reasonSummary",
+  reasonsummary: "reasonSummary",
+  make: "vehicleMake",
+  vehiclemake: "vehicleMake",
+  model: "vehicleModel",
+  vehiclemodel: "vehicleModel",
+  color: "vehicleColor",
+  vehiclecolor: "vehicleColor",
+};
+
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === "\"") {
+      if (inQuotes && next === "\"") {
+        current += "\"";
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim());
+  return values.map((value) => value.replace(/^"(.*)"$/, "$1").trim());
+}
+
+function parseCsvEntries(text: string): UploadEntry[] {
+  const rows = text
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean);
+
+  if (rows.length === 0) return [];
+
+  const firstRow = parseCsvLine(rows[0]);
+  const normalizedHeader = firstRow.map((column) => column.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  const hasHeader = normalizedHeader.some((column) => column in HEADER_ALIASES);
+
+  const mapRow = (values: string[], headerMap?: Array<keyof UploadEntry | null>): UploadEntry => {
+    if (headerMap) {
+      const entry: UploadEntry = { plateOriginal: "" };
+      headerMap.forEach((key, index) => {
+        if (!key) return;
+        const value = values[index]?.trim();
+        if (!value) return;
+        entry[key] = value;
+      });
+      return entry;
+    }
+
+    return {
+      plateOriginal: values[0] ?? "",
+      countryOrRegion: values[1] || undefined,
+      priority: values[2] || undefined,
+      reasonSummary: values[3] || undefined,
+      vehicleMake: values[4] || undefined,
+      vehicleModel: values[5] || undefined,
+      vehicleColor: values[6] || undefined,
+    };
+  };
+
+  if (hasHeader) {
+    const headerMap = normalizedHeader.map((column) => HEADER_ALIASES[column] ?? null);
+    return rows
+      .slice(1)
+      .map((row) => mapRow(parseCsvLine(row), headerMap))
+      .filter((entry) => entry.plateOriginal.trim());
+  }
+
+  return rows
+    .map((row) => mapRow(parseCsvLine(row)))
+    .filter((entry) => entry.plateOriginal.trim());
+}
+
 function statusBadgeVariant(status: HitlistStatus): "success" | "warning" | "secondary" {
   const map: Record<HitlistStatus, "success" | "warning" | "secondary"> = {
     ACTIVE: "success",
@@ -81,11 +187,16 @@ export default function WatchlistPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createDesc, setCreateDesc] = useState("");
+  const [createFileName, setCreateFileName] = useState("");
+  const [createEntries, setCreateEntries] = useState<UploadEntry[]>([]);
   const [creating, setCreating] = useState(false);
   const [showAddVersion, setShowAddVersion] = useState<string | null>(null);
   const [versionNote, setVersionNote] = useState("");
-  const [versionEntries, setVersionEntries] = useState("");
+  const [versionFileName, setVersionFileName] = useState("");
+  const [versionEntries, setVersionEntries] = useState<UploadEntry[]>([]);
   const [addingVersion, setAddingVersion] = useState(false);
+  const createFileInputRef = useRef<HTMLInputElement | null>(null);
+  const versionFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -102,6 +213,50 @@ export default function WatchlistPage() {
   }, [copy.listError]);
 
   useEffect(() => { void fetchList(); }, [fetchList]);
+
+  async function parseUploadFile(file: File) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      throw new Error(copy.unsupportedFileType);
+    }
+
+    const text = await file.text();
+    const entries = parseCsvEntries(text);
+    if (entries.length === 0) {
+      throw new Error(copy.uploadRequired);
+    }
+    return entries;
+  }
+
+  async function handleCreateFileChange(file: File | null) {
+    if (!file) return;
+    try {
+      const entries = await parseUploadFile(file);
+      setCreateEntries(entries);
+      setCreateFileName(file.name);
+      if (!createName.trim()) {
+        setCreateName(file.name.replace(/\.csv$/i, ""));
+      }
+      setError(null);
+    } catch (e) {
+      setCreateEntries([]);
+      setCreateFileName("");
+      setError(e instanceof Error ? e.message : copy.invalidSheet);
+    }
+  }
+
+  async function handleVersionFileChange(file: File | null) {
+    if (!file) return;
+    try {
+      const entries = await parseUploadFile(file);
+      setVersionEntries(entries);
+      setVersionFileName(file.name);
+      setError(null);
+    } catch (e) {
+      setVersionEntries([]);
+      setVersionFileName("");
+      setError(e instanceof Error ? e.message : copy.invalidSheet);
+    }
+  }
 
   async function loadDetail(id: string) {
     if (expandedId === id) {
@@ -124,7 +279,10 @@ export default function WatchlistPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!createName.trim()) return;
+    if (!createName.trim() || createEntries.length === 0) {
+      setError(copy.uploadRequired);
+      return;
+    }
     setCreating(true);
     try {
       const resp = await api.post<ApiResp<Hitlist>>("/api/hitlists", {
@@ -132,9 +290,19 @@ export default function WatchlistPage() {
         description: createDesc.trim() || undefined,
       });
       if (resp.success) {
+        const versionResp = await api.post<ApiResp<HitlistVersion>>(
+          `/api/hitlists/${resp.data.id}/versions`,
+          { note: "Initial import", entries: createEntries },
+        );
+        if (!versionResp.success) {
+          setError(versionResp.error);
+          return;
+        }
         setShowCreate(false);
         setCreateName("");
         setCreateDesc("");
+        setCreateFileName("");
+        setCreateEntries([]);
         void fetchList();
       } else {
         setError(resp.error);
@@ -147,30 +315,21 @@ export default function WatchlistPage() {
   }
 
   async function handleAddVersion(hitlistId: string) {
-    if (!versionEntries.trim()) return;
+    if (versionEntries.length === 0) {
+      setError(copy.uploadRequired);
+      return;
+    }
     setAddingVersion(true);
     try {
-      const lines = versionEntries.trim().split("\n").filter(Boolean);
-      const entries = lines.map((line) => {
-        const parts = line.split(",").map((p) => p.trim());
-        return {
-          plateOriginal: parts[0] ?? "",
-          countryOrRegion: parts[1] || undefined,
-          priority: parts[2] || undefined,
-          reasonSummary: parts[3] || undefined,
-          vehicleMake: parts[4] || undefined,
-          vehicleModel: parts[5] || undefined,
-          vehicleColor: parts[6] || undefined,
-        };
-      });
       const resp = await api.post<ApiResp<HitlistVersion>>(
         `/api/hitlists/${hitlistId}/versions`,
-        { note: versionNote.trim() || undefined, entries },
+        { note: versionNote.trim() || undefined, entries: versionEntries },
       );
       if (resp.success) {
         setShowAddVersion(null);
         setVersionNote("");
-        setVersionEntries("");
+        setVersionEntries([]);
+        setVersionFileName("");
         void fetchList();
         if (expandedId === hitlistId) await loadDetail(hitlistId);
       } else {
@@ -269,12 +428,39 @@ export default function WatchlistPage() {
                 className="w-full bg-input border border-border"
               />
             </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground block">{copy.uploadSheet}</Label>
+              <button
+                type="button"
+                onClick={() => createFileInputRef.current?.click()}
+                className="w-full rounded-xl border border-dashed border-border bg-card/20 px-5 py-8 text-center transition hover:border-primary/40 hover:bg-card/40"
+              >
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-card">
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium text-foreground">{copy.dragAndDrop}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{copy.csvOnly}</p>
+              </button>
+              <input
+                ref={createFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => void handleCreateFileChange(e.target.files?.[0] ?? null)}
+              />
+              <div className="rounded-lg border border-border/70 bg-card/20 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{copy.selectedFile}:</span>{" "}
+                {createFileName || copy.noFileSelected}
+              </div>
+              <p className="text-xs text-muted-foreground">{copy.expectedColumns}</p>
+              <p className="text-xs text-muted-foreground">{copy.uploadSheetHelp}</p>
+            </div>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="outline" onClick={() => setShowCreate(false)} className="glass glass-hover">
                 {common.cancel}
               </Button>
-              <Button type="submit" disabled={creating}>
-                {creating ? copy.creating : common.create}
+              <Button type="submit" disabled={creating || createEntries.length === 0}>
+                {creating ? copy.creating : copy.createWithUpload}
               </Button>
             </div>
           </form>
@@ -355,24 +541,41 @@ export default function WatchlistPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`ventries-${h.id}`} className="text-xs text-muted-foreground mb-1 block">
+                      <Label className="text-xs text-muted-foreground mb-1 block">
                         {copy.entriesHelp}
                       </Label>
-                      <textarea
+                      <button
+                        type="button"
+                        onClick={() => versionFileInputRef.current?.click()}
+                        className="w-full rounded-xl border border-dashed border-border bg-card/20 px-5 py-8 text-center transition hover:border-primary/40 hover:bg-card/40"
+                      >
+                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-card">
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">{copy.dragAndDrop}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{copy.csvOnly}</p>
+                      </button>
+                      <input
+                        ref={versionFileInputRef}
                         id={`ventries-${h.id}`}
-                        rows={5}
-                        value={versionEntries}
-                        onChange={(e) => setVersionEntries(e.target.value)}
-                        placeholder={"KA01AB1234, IN, HIGH, Hitlist vehicle detected\nMH02CD5678, IN, MEDIUM, Hitlist vehicle detected"}
-                        className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring font-mono resize-none"
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={(e) => void handleVersionFileChange(e.target.files?.[0] ?? null)}
                       />
+                      <div className="mt-2 rounded-lg border border-border/70 bg-card/20 px-3 py-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{copy.selectedFile}:</span>{" "}
+                        {versionFileName || copy.noFileSelected}
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{copy.expectedColumns}</p>
+                      <p className="text-xs text-muted-foreground">{copy.uploadVersionSheetHelp}</p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => { setShowAddVersion(null); setVersionNote(""); setVersionEntries(""); }}
+                        onClick={() => { setShowAddVersion(null); setVersionNote(""); setVersionEntries([]); setVersionFileName(""); }}
                         className="glass glass-hover"
                       >
                         {common.cancel}
@@ -380,7 +583,7 @@ export default function WatchlistPage() {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={addingVersion || !versionEntries.trim()}
+                        disabled={addingVersion || versionEntries.length === 0}
                         onClick={() => void handleAddVersion(h.id)}
                       >
                         {addingVersion ? copy.uploading : copy.uploadEntries}

@@ -126,6 +126,51 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function svgDataUrl(svg: string): string {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function createPlateImage(plate: string): string {
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#f8fafc"/>
+          <stop offset="100%" stop-color="#dbe4f0"/>
+        </linearGradient>
+      </defs>
+      <rect width="320" height="160" fill="#1f2937"/>
+      <rect x="22" y="28" width="276" height="104" rx="10" fill="url(#bg)" stroke="#94a3b8" stroke-width="6"/>
+      <rect x="36" y="42" width="40" height="76" rx="6" fill="#111827"/>
+      <text x="56" y="91" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" font-weight="700" fill="#f8fafc">B</text>
+      <text x="168" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="700" fill="#0f172a" letter-spacing="4">${plate}</text>
+    </svg>
+  `);
+}
+
+function createVehicleImage(body: string, accent: string): string {
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">
+      <defs>
+        <linearGradient id="road" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#e2e8f0"/>
+          <stop offset="100%" stop-color="#94a3b8"/>
+        </linearGradient>
+      </defs>
+      <rect width="480" height="320" fill="#dbeafe"/>
+      <rect y="180" width="480" height="140" fill="url(#road)"/>
+      <circle cx="150" cy="240" r="34" fill="#111827"/>
+      <circle cx="340" cy="240" r="34" fill="#111827"/>
+      <circle cx="150" cy="240" r="16" fill="#94a3b8"/>
+      <circle cx="340" cy="240" r="16" fill="#94a3b8"/>
+      <path d="M90 215 L140 150 H322 C343 150 358 159 369 176 L396 215 Z" fill="${body}" stroke="#334155" stroke-width="6"/>
+      <path d="M166 158 H310 C325 158 337 166 345 180 H150 Z" fill="#cbd5e1" opacity="0.9"/>
+      <rect x="116" y="190" width="250" height="18" rx="8" fill="${accent}" opacity="0.75"/>
+      <rect x="201" y="202" width="76" height="22" rx="4" fill="#7f1d1d"/>
+    </svg>
+  `);
+}
+
 function tr(value: string | null | undefined, language: Language): string | null | undefined {
   if (value == null || language === "en") return value;
   return MOCK_TEXT_AR[value] ?? value;
@@ -213,6 +258,9 @@ function localizeAlert(alert: MatchEvent, language: Language): MatchEvent {
           model: tr(alert.detection.model, language)!,
           color: tr(alert.detection.color, language)!,
           category: tr(alert.detection.category, language)!,
+          emirate: tr(alert.detection.emirate ?? null, language) ?? null,
+          cameraName: tr(alert.detection.cameraName ?? null, language) ?? null,
+          scannedBy: tr(alert.detection.scannedBy ?? null, language) ?? null,
         }
       : null,
     workstation: alert.workstation
@@ -463,6 +511,9 @@ const store: MockStoreState = {
       createdAt: iso(-1000 * 60 * 18),
       detection: {
         plate: "KA01AB1234",
+        secondaryPlate: "AB1234",
+        code: "B",
+        emirate: "RAK",
         country: "IN",
         make: "Toyota",
         model: "Innova",
@@ -470,7 +521,13 @@ const store: MockStoreState = {
         category: "SUV",
         confidence: 0.96,
         occurredAt: iso(-1000 * 60 * 18),
-        snapshotUrl: null,
+        snapshotUrl: createVehicleImage("#d6d3d1", "#f8fafc"),
+        plateImageUrl: createPlateImage("AB1234"),
+        vehicleImageUrl: createVehicleImage("#d6d3d1", "#f8fafc"),
+        cameraName: "Camera #1",
+        heightCharacter: 11,
+        scannedBy: "Admin",
+        latitude: 25.2048,
       },
       workstation: {
         name: "Checkpoint Alpha",
@@ -491,6 +548,9 @@ const store: MockStoreState = {
       createdAt: iso(-1000 * 60 * 72),
       detection: {
         plate: "TN09CD5678",
+        secondaryPlate: "CD5678",
+        code: "4",
+        emirate: "KSA",
         country: "IN",
         make: "Honda",
         model: "City",
@@ -498,7 +558,13 @@ const store: MockStoreState = {
         category: "Sedan",
         confidence: 0.89,
         occurredAt: iso(-1000 * 60 * 72),
-        snapshotUrl: null,
+        snapshotUrl: createVehicleImage("#e5e7eb", "#111827"),
+        plateImageUrl: createPlateImage("CD5678"),
+        vehicleImageUrl: createVehicleImage("#e5e7eb", "#111827"),
+        cameraName: "Camera #2",
+        heightCharacter: 14,
+        scannedBy: "Admin",
+        latitude: 24.7136,
       },
       workstation: {
         name: "Highway Patrol Van",
@@ -510,6 +576,80 @@ const store: MockStoreState = {
         reasonSummary: "Hitlist vehicle detected",
         priority: "MEDIUM",
         caseReference: "CASE-1002",
+      },
+    },
+    {
+      id: "alert-3",
+      alertStatus: "ESCALATED",
+      note: "Regional unit notified for interception",
+      createdAt: iso(-1000 * 60 * 125),
+      detection: {
+        plate: "MH12EF9012",
+        secondaryPlate: "EF9012",
+        code: "7",
+        emirate: "DXB",
+        country: "IN",
+        make: "Hyundai",
+        model: "Creta",
+        color: "Silver",
+        category: "SUV",
+        confidence: 0.93,
+        occurredAt: iso(-1000 * 60 * 125),
+        snapshotUrl: createVehicleImage("#cbd5e1", "#64748b"),
+        plateImageUrl: createPlateImage("EF9012"),
+        vehicleImageUrl: createVehicleImage("#cbd5e1", "#64748b"),
+        cameraName: "Camera #3",
+        heightCharacter: 12,
+        scannedBy: "Admin",
+        latitude: 19.076,
+      },
+      workstation: {
+        name: "Checkpoint Alpha",
+        deviceId: "ws-001",
+      },
+      hitlistEntry: {
+        id: "entry-3",
+        plateOriginal: "MH12EF9012",
+        reasonSummary: "Hitlist vehicle detected",
+        priority: "HIGH",
+        caseReference: "CASE-1003",
+      },
+    },
+    {
+      id: "alert-4",
+      alertStatus: "RESOLVED",
+      note: "Plate verified and closed by operator",
+      createdAt: iso(-1000 * 60 * 210),
+      detection: {
+        plate: "DL04GH3456",
+        secondaryPlate: "GH3456",
+        code: "2",
+        emirate: "AUH",
+        country: "IN",
+        make: "Maruti",
+        model: "Baleno",
+        color: "Blue",
+        category: "Sedan",
+        confidence: 0.87,
+        occurredAt: iso(-1000 * 60 * 210),
+        snapshotUrl: createVehicleImage("#93c5fd", "#1d4ed8"),
+        plateImageUrl: createPlateImage("GH3456"),
+        vehicleImageUrl: createVehicleImage("#93c5fd", "#1d4ed8"),
+        cameraName: "Camera #4",
+        heightCharacter: 10,
+        scannedBy: "Admin",
+        latitude: 28.6139,
+      },
+      workstation: {
+        name: "Highway Patrol Van",
+        deviceId: "ws-002",
+      },
+      hitlistEntry: {
+        id: "entry-4",
+        plateOriginal: "DL04GH3456",
+        reasonSummary: "Hitlist vehicle detected",
+        priority: "LOW",
+        caseReference: "CASE-1004",
       },
     },
   ],
@@ -1006,6 +1146,9 @@ export function portalScan(input: {
       createdAt: occurredAt,
       detection: {
         plate: input.plate,
+        secondaryPlate: normalizePlate(input.plate).slice(-6) || null,
+        code: "B",
+        emirate: "RAK",
         country: input.country ?? entry.countryOrRegion ?? "",
         make: input.make ?? entry.vehicleMake ?? "",
         model: input.model ?? entry.vehicleModel ?? "",
@@ -1013,7 +1156,13 @@ export function portalScan(input: {
         category: input.category ?? "Vehicle",
         confidence: input.confidence ?? 0.92,
         occurredAt,
-        snapshotUrl: null,
+        snapshotUrl: createVehicleImage("#cbd5e1", "#e2e8f0"),
+        plateImageUrl: createPlateImage(normalizePlate(input.plate).slice(-6) || input.plate),
+        vehicleImageUrl: createVehicleImage("#cbd5e1", "#e2e8f0"),
+        cameraName: "Camera #1",
+        heightCharacter: 12,
+        scannedBy: "Admin",
+        latitude: 25.276987,
       },
       workstation: workstation ? { name: workstation.name, deviceId: workstation.deviceId } : null,
       hitlistEntry: {
