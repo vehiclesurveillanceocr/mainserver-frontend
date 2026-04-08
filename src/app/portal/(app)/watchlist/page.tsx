@@ -190,13 +190,7 @@ export default function WatchlistPage() {
   const [createFileName, setCreateFileName] = useState("");
   const [createEntries, setCreateEntries] = useState<UploadEntry[]>([]);
   const [creating, setCreating] = useState(false);
-  const [showAddVersion, setShowAddVersion] = useState<string | null>(null);
-  const [versionNote, setVersionNote] = useState("");
-  const [versionFileName, setVersionFileName] = useState("");
-  const [versionEntries, setVersionEntries] = useState<UploadEntry[]>([]);
-  const [addingVersion, setAddingVersion] = useState(false);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
-  const versionFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -240,20 +234,6 @@ export default function WatchlistPage() {
     } catch (e) {
       setCreateEntries([]);
       setCreateFileName("");
-      setError(e instanceof Error ? e.message : copy.invalidSheet);
-    }
-  }
-
-  async function handleVersionFileChange(file: File | null) {
-    if (!file) return;
-    try {
-      const entries = await parseUploadFile(file);
-      setVersionEntries(entries);
-      setVersionFileName(file.name);
-      setError(null);
-    } catch (e) {
-      setVersionEntries([]);
-      setVersionFileName("");
       setError(e instanceof Error ? e.message : copy.invalidSheet);
     }
   }
@@ -311,34 +291,6 @@ export default function WatchlistPage() {
       setError(e instanceof Error ? e.message : copy.createError);
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function handleAddVersion(hitlistId: string) {
-    if (versionEntries.length === 0) {
-      setError(copy.uploadRequired);
-      return;
-    }
-    setAddingVersion(true);
-    try {
-      const resp = await api.post<ApiResp<HitlistVersion>>(
-        `/api/hitlists/${hitlistId}/versions`,
-        { note: versionNote.trim() || undefined, entries: versionEntries },
-      );
-      if (resp.success) {
-        setShowAddVersion(null);
-        setVersionNote("");
-        setVersionEntries([]);
-        setVersionFileName("");
-        void fetchList();
-        if (expandedId === hitlistId) await loadDetail(hitlistId);
-      } else {
-        setError(resp.error);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : copy.versionError);
-    } finally {
-      setAddingVersion(false);
     }
   }
 
@@ -509,89 +461,7 @@ export default function WatchlistPage() {
                     </p>
                   </div>
                 </Button>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddVersion(showAddVersion === h.id ? null : h.id)}
-                    className="text-xs glass glass-hover"
-                  >
-                    <Upload className="h-3 w-3" />
-                    {copy.addVersion}
-                  </Button>
-                </div>
               </div>
-
-              {showAddVersion === h.id && (
-                <div className="border-t border-border px-5 py-4 bg-card/30">
-                  <h3 className="text-sm font-medium text-foreground mb-3">
-                    {copy.addVersionTo} "{h.name}"
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label htmlFor={`vnote-${h.id}`} className="text-xs text-muted-foreground mb-1 block">{copy.noteOptional}</Label>
-                      <Input
-                        id={`vnote-${h.id}`}
-                        type="text"
-                        value={versionNote}
-                        onChange={(e) => setVersionNote(e.target.value)}
-                        placeholder={copy.notePlaceholder}
-                        className="w-full bg-input border border-border"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        {copy.entriesHelp}
-                      </Label>
-                      <button
-                        type="button"
-                        onClick={() => versionFileInputRef.current?.click()}
-                        className="w-full rounded-xl border border-dashed border-border bg-card/20 px-5 py-8 text-center transition hover:border-primary/40 hover:bg-card/40"
-                      >
-                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-card">
-                          <Upload className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <p className="text-sm font-medium text-foreground">{copy.dragAndDrop}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{copy.csvOnly}</p>
-                      </button>
-                      <input
-                        ref={versionFileInputRef}
-                        id={`ventries-${h.id}`}
-                        type="file"
-                        accept=".csv,text/csv"
-                        className="hidden"
-                        onChange={(e) => void handleVersionFileChange(e.target.files?.[0] ?? null)}
-                      />
-                      <div className="mt-2 rounded-lg border border-border/70 bg-card/20 px-3 py-2 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{copy.selectedFile}:</span>{" "}
-                        {versionFileName || copy.noFileSelected}
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">{copy.expectedColumns}</p>
-                      <p className="text-xs text-muted-foreground">{copy.uploadVersionSheetHelp}</p>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setShowAddVersion(null); setVersionNote(""); setVersionEntries([]); setVersionFileName(""); }}
-                        className="glass glass-hover"
-                      >
-                        {common.cancel}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={addingVersion || versionEntries.length === 0}
-                        onClick={() => void handleAddVersion(h.id)}
-                      >
-                        {addingVersion ? copy.uploading : copy.uploadEntries}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {expandedId === h.id && (
                 <div className="border-t border-border">

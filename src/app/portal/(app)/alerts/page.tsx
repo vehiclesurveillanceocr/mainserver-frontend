@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -409,7 +408,7 @@ export default function AlertsPage() {
               <EmptyState />
             ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                <div className="overflow-hidden rounded-xl border border-border/60">
                   {events.map((event) => {
                     const detection = event.detection;
                     const status = statusConfig[event.alertStatus];
@@ -418,150 +417,214 @@ export default function AlertsPage() {
                     const isActionOpen = actionState?.eventId === event.id;
                     const isExpanded = expandedIds.includes(event.id);
                     const ExpandIcon = isExpanded ? ChevronUp : ChevronDown;
+                    const plateValue = detection?.plate ?? event.hitlistEntry?.plateOriginal ?? copy.unknownPlate;
+                    const vehicleSummary = getVehicleSummary(detection, copy.unknownVehicle);
+                    const workstationName = event.workstation?.name ?? copy.unknownWorkstation;
+                    const confidenceValue = detection ? `${Math.round(detection.confidence * 100)}%` : dictionary.common.notAvailable;
+                    const eventDate = detection?.occurredAt ? formatDate(detection.occurredAt) : dictionary.common.notAvailable;
+                    const eventTime = detection?.occurredAt ? formatTime(detection.occurredAt) : dictionary.common.notAvailable;
+                    const snapshotAvailability = detection?.snapshotUrl ? dictionary.common.available : dictionary.common.unavailable;
 
                     return (
-                      <Card key={event.id} className="glass glass-hover self-start transition-all rounded-xl border-border/60">
-                        <CardContent className="p-5 space-y-4">
-                          <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0 flex-1 space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-2xl font-bold font-mono tracking-wide text-foreground truncate force-ltr">
-                                  {detection?.plate ?? event.hitlistEntry?.plateOriginal ?? copy.unknownPlate}
-                                </span>
-                                <Badge
-                                  variant="outline"
-                                  className={cn("inline-flex items-center gap-1.5", status.color)}
-                                >
-                                  <StatusIcon className="h-3.5 w-3.5" />
-                                  {status.label}
-                                </Badge>
-                                {priority && (
-                                  <Badge variant={priorityVariant(priority)}>
-                                    {priority} {copy.prioritySuffix}
-                                  </Badge>
-                                )}
+                      <div
+                        key={event.id}
+                        className={cn(
+                          "glass transition-all",
+                          "border-b border-border/60 last:border-b-0",
+                          isExpanded && "bg-card/20",
+                        )}
+                      >
+                        <div className="p-4 sm:p-5">
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0 flex-1 space-y-4">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="min-w-0 space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-lg font-bold font-mono tracking-wide text-foreground force-ltr">
+                                      {plateValue}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn("inline-flex items-center gap-1.5", status.color)}
+                                    >
+                                      <StatusIcon className="h-3.5 w-3.5" />
+                                      {status.label}
+                                    </Badge>
+                                    {priority && (
+                                      <Badge variant={priorityVariant(priority)}>
+                                        {priority} {copy.prioritySuffix}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-foreground break-words">{vehicleSummary}</p>
+                                </div>
+
+                                <div className="flex flex-wrap items-start gap-2 lg:max-w-xs lg:justify-end">
+                                  {event.hitlistEntry?.reasonSummary && (
+                                    <div className="max-w-xs rounded-md border border-border/80 bg-card/35 px-2.5 py-1.5 text-right">
+                                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{copy.reasonSummary}</p>
+                                      <p className="mt-0.5 text-xs text-foreground line-clamp-2 break-words">{event.hitlistEntry.reasonSummary}</p>
+                                    </div>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => toggleExpanded(event.id)}
+                                    className="glass glass-hover text-xs font-medium border-primary/30"
+                                    aria-expanded={isExpanded}
+                                  >
+                                    <ExpandIcon className="h-3.5 w-3.5" />
+                                    {isExpanded ? copy.hideDetails : copy.showDetails}
+                                  </Button>
+                                </div>
                               </div>
 
-                              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                                <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.vehicle}</p>
-                                  <p className="mt-1 text-foreground">{getVehicleSummary(detection, copy.unknownVehicle)}</p>
+                              <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-5">
+                                <div className="min-w-0">
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.workstation}</p>
+                                  <p className="mt-1 text-foreground break-words">{workstationName}</p>
                                 </div>
                                 <div>
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.workstation}</p>
-                                  <p className="mt-1 text-foreground">{event.workstation?.name ?? copy.unknownWorkstation}</p>
+                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.date}</p>
+                                  <p className="mt-1 text-foreground">{eventDate}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.time}</p>
-                                  <p className="mt-1 text-foreground">
-                                    {detection?.occurredAt ? formatTime(detection.occurredAt) : dictionary.common.notAvailable}
-                                  </p>
+                                  <p className="mt-1 text-foreground">{eventTime}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">{dictionary.common.confidence}</p>
-                                  <p className="mt-1 text-foreground">
-                                    {detection ? `${Math.round(detection.confidence * 100)}%` : dictionary.common.notAvailable}
-                                  </p>
+                                  <p className="mt-1 text-foreground">{confidenceValue}</p>
                                 </div>
-                              </div>
-
-                              {event.hitlistEntry?.reasonSummary && (
-                                <div className="rounded-lg border border-border bg-card/30 px-3 py-2">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.reasonSummary}</p>
-                                  <p className="mt-1 text-sm text-foreground">{event.hitlistEntry.reasonSummary}</p>
-                                </div>
-                              )}
-
-                              {event.note && (
-                                <div className="rounded-lg border border-border/80 px-3 py-2">
+                                <div>
                                   <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.latestNote}</p>
-                                  <p className="mt-1 text-sm text-muted-foreground">{event.note}</p>
+                                  <p className="mt-1 text-foreground break-words">{event.note ?? dictionary.common.notAvailable}</p>
                                 </div>
-                              )}
-                              </div>
-
-                              <div className="flex shrink-0 items-start justify-between gap-3 sm:flex-col sm:items-end">
-                                <div className="text-xs text-muted-foreground force-ltr">
-                                  {formatRelativeTime(event.createdAt)}
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => toggleExpanded(event.id)}
-                                  className="glass glass-hover text-xs"
-                                  aria-expanded={isExpanded}
-                                >
-                                  <ExpandIcon className="h-3.5 w-3.5" />
-                                  {isExpanded ? copy.hideDetails : copy.showDetails}
-                                </Button>
                               </div>
                             </div>
 
-                            {isExpanded && (
-                              <div className="space-y-4 rounded-xl border border-border/60 bg-background/30 p-4">
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <ImagePanel
-                                    label={copy.plateImage}
-                                    src={detection?.plateImageUrl ?? null}
-                                    fallback={copy.noImage}
-                                  />
-                                  <ImagePanel
-                                    label={copy.vehicleImage}
-                                    src={detection?.vehicleImageUrl ?? detection?.snapshotUrl ?? null}
-                                    fallback={copy.noImage}
-                                  />
+                            <div className="flex shrink-0 flex-wrap items-center gap-2 xl:max-w-[18rem] xl:justify-end">
+                              <div className="text-xs text-muted-foreground force-ltr xl:mr-1">
+                                {formatRelativeTime(event.createdAt)}
+                              </div>
+                              {actionStatuses.filter((nextStatus) => nextStatus !== event.alertStatus).map((nextStatus) => (
+                                <Button
+                                  key={nextStatus}
+                                  type="button"
+                                  size="sm"
+                                  variant={isActionOpen && actionState?.nextStatus === nextStatus ? "default" : "outline"}
+                                  onClick={() => {
+                                    setActionState((current) =>
+                                      current?.eventId === event.id && current.nextStatus === nextStatus
+                                        ? null
+                                        : { eventId: event.id, nextStatus, note: "" },
+                                    );
+                                  }}
+                                  className={cn(
+                                    "text-xs",
+                                    !(isActionOpen && actionState?.nextStatus === nextStatus) && "glass glass-hover",
+                                  )}
+                                  disabled={submittingId === event.id}
+                                >
+                                  {actionLabels[nextStatus]}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-4 space-y-4 rounded-xl border border-border/60 bg-background/30 p-4">
+                              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                                <ImagePanel
+                                  label={copy.plateImage}
+                                  src={detection?.plateImageUrl ?? null}
+                                  fallback={copy.noImage}
+                                />
+                                <ImagePanel
+                                  label={dictionary.common.snapshot}
+                                  src={detection?.snapshotUrl ?? null}
+                                  fallback={copy.noImage}
+                                />
+                                <ImagePanel
+                                  label={copy.vehicleImage}
+                                  src={detection?.vehicleImageUrl ?? null}
+                                  fallback={copy.noImage}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.details}</p>
+                                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                                  <DetailItem label={dictionary.common.plate} value={plateValue} />
+                                  <DetailItem label={copy.secondaryPlate} value={detection?.secondaryPlate ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={copy.code} value={detection?.code ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={copy.emirate} value={detection?.emirate ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={dictionary.common.country} value={detection?.country ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={dictionary.common.vehicle} value={vehicleSummary} />
+                                  <DetailItem label={dictionary.common.confidence} value={confidenceValue} />
+                                  <DetailItem label={copy.cameraName} value={detection?.cameraName ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={dictionary.common.workstation} value={workstationName} />
+                                  <DetailItem label="Device ID" value={event.workstation?.deviceId ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={copy.date} value={eventDate} />
+                                  <DetailItem label={copy.time} value={eventTime} />
+                                  <DetailItem label={dictionary.common.timestamp} value={event.createdAt} />
+                                  <DetailItem label={copy.scannedBy} value={detection?.scannedBy ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={copy.heightCharacter} value={detection?.heightCharacter != null ? String(detection.heightCharacter) : dictionary.common.notAvailable} />
+                                  <DetailItem label={copy.latitude} value={detection?.latitude != null ? detection.latitude.toFixed(6) : dictionary.common.notAvailable} />
+                                  <DetailItem label={dictionary.common.snapshot} value={snapshotAvailability} />
+                                  <DetailItem label={dictionary.common.priority} value={priority ?? dictionary.common.notAvailable} />
+                                  <DetailItem label="Case Reference" value={event.hitlistEntry?.caseReference ?? dictionary.common.notAvailable} />
+                                  <DetailItem label={dictionary.common.reason} value={event.hitlistEntry?.reasonSummary ?? dictionary.common.notAvailable} />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                <div className="rounded-lg border border-border/70 bg-background/40 px-4 py-3">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Hitlist</p>
+                                  <div className="mt-2 space-y-2 text-sm">
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{dictionary.common.plate}: </span>
+                                      <span className="font-mono force-ltr">{event.hitlistEntry?.plateOriginal ?? dictionary.common.notAvailable}</span>
+                                    </p>
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{dictionary.common.priority}: </span>
+                                      {priority ?? dictionary.common.notAvailable}
+                                    </p>
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{dictionary.common.reason}: </span>
+                                      {event.hitlistEntry?.reasonSummary ?? dictionary.common.notAvailable}
+                                    </p>
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">Case Reference: </span>
+                                      {event.hitlistEntry?.caseReference ?? dictionary.common.notAvailable}
+                                    </p>
+                                  </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{copy.details}</p>
-                                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                                    <DetailItem label={dictionary.common.plate} value={detection?.plate ?? copy.unknownPlate} />
-                                    <DetailItem label={copy.secondaryPlate} value={detection?.secondaryPlate ?? dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.code} value={detection?.code ?? dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.emirate} value={detection?.emirate ?? dictionary.common.notAvailable} />
-                                    <DetailItem label={dictionary.common.country} value={detection?.country || dictionary.common.notAvailable} />
-                                    <DetailItem label={dictionary.common.snapshot} value={detection?.snapshotUrl ? dictionary.common.available : dictionary.common.unavailable} />
-                                    <DetailItem label={copy.cameraName} value={detection?.cameraName ?? event.workstation?.name ?? copy.unknownWorkstation} />
-                                    <DetailItem label={copy.date} value={detection?.occurredAt ? formatDate(detection.occurredAt) : dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.time} value={detection?.occurredAt ? formatTime(detection.occurredAt) : dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.heightCharacter} value={detection?.heightCharacter != null ? String(detection.heightCharacter) : dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.scannedBy} value={detection?.scannedBy ?? dictionary.common.notAvailable} />
-                                    <DetailItem label={copy.latitude} value={detection?.latitude != null ? detection.latitude.toFixed(6) : dictionary.common.notAvailable} />
+                                <div className="rounded-lg border border-border/70 bg-background/40 px-4 py-3">
+                                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Operator</p>
+                                  <div className="mt-2 space-y-2 text-sm">
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{copy.latestNote}: </span>
+                                      {event.note ?? dictionary.common.notAvailable}
+                                    </p>
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{dictionary.common.status}: </span>
+                                      {status.label}
+                                    </p>
+                                    <p className="text-foreground break-words">
+                                      <span className="text-muted-foreground">{dictionary.common.timestamp}: </span>
+                                      {event.createdAt}
+                                    </p>
                                   </div>
                                 </div>
                               </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {actionStatuses.filter((nextStatus) => nextStatus !== event.alertStatus).map((nextStatus) => (
-                              <Button
-                                key={nextStatus}
-                                type="button"
-                                size="sm"
-                                variant={isActionOpen && actionState?.nextStatus === nextStatus ? "default" : "outline"}
-                                onClick={() => {
-                                  setActionState((current) =>
-                                    current?.eventId === event.id && current.nextStatus === nextStatus
-                                      ? null
-                                      : { eventId: event.id, nextStatus, note: "" },
-                                  );
-                                }}
-                                className={cn(
-                                  "text-xs",
-                                  !(isActionOpen && actionState?.nextStatus === nextStatus) && "glass glass-hover",
-                                )}
-                                disabled={submittingId === event.id}
-                              >
-                                {actionLabels[nextStatus]}
-                              </Button>
-                            ))}
-                          </div>
+                            </div>
+                          )}
 
                           {isActionOpen && actionState && (
-                            <div className="rounded-lg border border-border bg-card/30 p-3 space-y-3">
+                            <div className="mt-4 rounded-lg border border-border bg-card/30 p-3 space-y-3">
                               <div>
                                 <Label
                                   htmlFor={`note-${event.id}`}
@@ -605,8 +668,8 @@ export default function AlertsPage() {
                               </div>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>

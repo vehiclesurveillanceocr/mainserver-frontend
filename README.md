@@ -25,7 +25,7 @@ pnpm dev
 
 ## Demo credentials
 
-- Admin: `sibi@sibi.com` / `sibi`
+- Admin: `admin@surveillance.com` / `q6fA#567TTd_`
 - Scanner: `scanner@scanner.com` / `scanner`
 
 ## Project structure

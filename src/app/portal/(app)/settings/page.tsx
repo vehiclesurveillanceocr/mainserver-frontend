@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { auth } from "@/lib/auth-client";
 import { useLanguage } from "@/components/language-provider";
+import { LANGUAGE_META } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -409,8 +410,8 @@ export default function SettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="en">{dictionary.common.english}</SelectItem>
-                      <SelectItem value="ar">{dictionary.common.arabic}</SelectItem>
+                      <SelectItem value="en">{LANGUAGE_META.en.label}</SelectItem>
+                      <SelectItem value="ar">{LANGUAGE_META.ar.label}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
