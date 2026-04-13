@@ -115,7 +115,7 @@ function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 type NavItem = {
-  key: "dashboard" | "alerts" | "search" | "analytics" | "watchlist" | "devices" | "updates" | "settings";
+  key: "dashboard" | "alerts" | "search" | "analytics" | "watchlist" | "devices" | "provisioning" | "updates" | "settings";
   icon: React.ComponentType<{ className?: string }>;
   href: string;
 };
@@ -127,6 +127,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "analytics", icon: BarChart3, href: "/portal/analytics" },
   { key: "watchlist", icon: ListChecks, href: "/portal/watchlist" },
   { key: "devices", icon: HardDrive, href: "/portal/devices" },
+  { key: "provisioning", icon: Shield, href: "/portal/provisioning" },
   { key: "updates", icon: HardDrive, href: "/portal/updates" },
   { key: "settings", icon: Settings, href: "/portal/settings" },
 ];
